@@ -35,51 +35,57 @@ string cformat(in string str, ubyte[] args) {
 	return ret;
 }
 
-
-class CPU {
+struct State {
+	bool z, s, p, cy, ac;
+}
+struct Mem {
 	// registers
 	ubyte a, b, c, d, e, h, l;
 
 	// program data
 	ubyte[] program;
 
-	// program counter
-	size_t pc;
+	// stack pointer and program counter
+	ushort sp, pc;
 
-	void dissassemble() {
-		pc = 0;
-		opcodes.Opcode curr;
+	ubyte int_enable;
+}
 
-		while (pc < program.length) {
-			curr = opcodes.opcodes[program[pc]];
 
-			{
-				import std.string: format;
 
-				string hex = format("%02x", program[pc++]);
+void print_dissasembly(Mem mem) {
+	ushort pc; // make our own, to avoid disrupting Mem's
+	opcodes.Opcode curr;
 
-				// write out hex
-				foreach (i; 0 .. curr.size) {
-					hex ~= format(" %02x", program[pc+i]);
-				}
-				writef("%-10s", hex); // max 8 characters (6 hex, plus 2 spaces, plus some padding
-							// - left-aligns
+	while (pc < mem.program.length) {
+		curr = opcodes.opcodes[mem.program[pc]];
+
+		{
+			import std.string: format;
+
+			string hex = format("%02x", mem.program[pc++]);
+
+			// write out hex
+			foreach (i; 0 .. curr.size) {
+				hex ~= format(" %02x", mem.program[pc+i]);
 			}
-
-			write("\t\t"); // padding
-
-
-//			pc++; // skip over the opcode
-
-
-			// write dissassembly
-			write(curr.opcode);
-			write("\t");
-			write(cformat(curr.format_string, program[pc .. pc+curr.size]));
-			writeln;
-
-			// skip over arguments
-			pc += curr.size;
+			writef("%-10s", hex); // max 8 characters (6 hex, plus 2 spaces, plus some padding
+			// - left-aligns
 		}
+
+		write("\t\t"); // padding
+
+
+		//			pc++; // skip over the opcode
+
+
+		// write dissassembly
+		write(curr.opcode);
+		write("\t");
+		write(cformat(curr.format_string, mem.program[pc .. pc+curr.size]));
+		writeln;
+
+		// skip over arguments
+		pc += curr.size;
 	}
 }
