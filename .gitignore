@@ -1,0 +1,20 @@
+# Dub turds
+dub.selections.json
+.dub
+docs.json
+__dummy.html
+docs/
+emu101-test-*
+*.exe
+*.o
+*.obj
+*.lst
+emu101
+
+
+# Vim turds
+.*.swp
+.*.swo
+.*.swn
+.*.swm
+.*.swl
