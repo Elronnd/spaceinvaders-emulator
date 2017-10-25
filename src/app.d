@@ -6,9 +6,8 @@ import CPU;
 void main(string[] args) {
 	import std.file: read;
 
-	Mem m;
-
-	m.program = cast(ubyte[])read(args[1]);
-	print_dissasembly(m);
+	State s = new State();
+	s.mem.program = cast(ubyte[])read(args[1]);
+	run(s);
 	writeln("Edit source/app.d to start your project.");
 }

@@ -35,7 +35,7 @@ string cformat(in string str, ubyte[] args) {
 	return ret;
 }
 
-struct State {
+struct Condition {
 	bool z, s, p, cy, ac;
 }
 struct Mem {
@@ -50,6 +50,30 @@ struct Mem {
 
 	ubyte int_enable;
 }
+
+// automatic class by reference; that is all
+class State {
+	Mem mem;
+	Condition condition;
+}
+
+
+void run(State state) {
+	state.mem.pc = 0;
+	opcodes.Opcode curr;
+	ubyte opcode;
+	ubyte[] opargs;
+
+	while (state.mem.pc < state.mem.program.length) {
+		opcode = state.mem.program[state.mem.pc++];
+		curr = opcodes.opcodes[opcode];
+		opargs = state.mem.program[state.mem.pc .. state.mem.pc+=curr.size];
+
+		curr.fun(state, opcode, opargs);
+	}
+}
+
+
 
 
 
