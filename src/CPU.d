@@ -20,8 +20,6 @@ string cformat(in string str, ubyte[] args) {
 				ret ~= format("%02x", args[argindex++]);
 			// indexed format string
 			} else if (('0' <= str[index]) && (str[index] <= '9')) {
-//				writefln("It was %d ('%c').  Length is %s.  So we can get s.  Hellno world?", str[index] - '0', str[index], args.length/*, args[str[index] - '0']*/);
-//				ubyte cxx = args[str[index] - '0'];
 				ret ~= format("%02x", args[str[index] - '0']);
 			// Bare %, but we'll allow it
 			} else {
@@ -42,12 +40,13 @@ struct Mem {
 	// registers
 	ubyte a, b, c, d, e, h, l;
 
-	// program data
-	ubyte[] program;
+	// memory space, including the program
+	ubyte[] memory;
 
 	// stack pointer and program counter
 	ushort sp, pc;
 
+	// enable interrupts
 	ubyte int_enable;
 }
 
@@ -58,18 +57,34 @@ class State {
 }
 
 
+void set_condition(State state, short ans) {
+	state.condition.z = ((ans & 0xff) == 0);
+	state.condition.s = ((ans & 0x80) != 0);
+//	state.condition.p = Parity(ans&0xff);
+	state.condition.cy = (ans > 0xff);
+//	state.condition.ac = (ans & 0xff) != 0;
+//	state.condition.a = ans & 0xff;
+}
+
+
 void run(State state) {
 	state.mem.pc = 0;
 	opcodes.Opcode curr;
 	ubyte opcode;
 	ubyte[] opargs;
+	short ans;
 
-	while (state.mem.pc < state.mem.program.length) {
-		opcode = state.mem.program[state.mem.pc++];
+	while (state.mem.pc < state.mem.memory.length /* 0x1fff */ /* || true */) {
+		opcode = state.mem.memory[state.mem.pc++];
 		curr = opcodes.opcodes[opcode];
-		opargs = state.mem.program[state.mem.pc .. state.mem.pc+=curr.size];
+		opargs = state.mem.memory[state.mem.pc .. state.mem.pc+=curr.size];
 
-		curr.fun(state, opcode, opargs);
+		ans = curr.fun(state, opcode, opargs);
+
+		if (ans >= 0) {
+			set_condition(state, ans);
+			state.mem.a = ans & 0xff;
+		}
 	}
 }
 
@@ -81,32 +96,31 @@ void print_dissasembly(Mem mem) {
 	ushort pc; // make our own, to avoid disrupting Mem's
 	opcodes.Opcode curr;
 
-	while (pc < mem.program.length) {
-		curr = opcodes.opcodes[mem.program[pc]];
+	while (pc < mem.memory.length /* 0x1fff */) {
+		writef("%04x: ", pc);
+
+		curr = opcodes.opcodes[mem.memory[pc]];
 
 		{
 			import std.string: format;
 
-			string hex = format("%02x", mem.program[pc++]);
+			string hex = format("%02x", mem.memory[pc++]);
 
 			// write out hex
 			foreach (i; 0 .. curr.size) {
-				hex ~= format(" %02x", mem.program[pc+i]);
+				hex ~= format(" %02x", mem.memory[pc+i]);
 			}
-			writef("%-10s", hex); // max 8 characters (6 hex, plus 2 spaces, plus some padding
+			writef("%-8s", hex); // max 8 characters (6 hex, plus 2 spaces, plus some padding
 			// - left-aligns
 		}
 
 		write("\t\t"); // padding
 
 
-		//			pc++; // skip over the opcode
-
-
 		// write dissassembly
 		write(curr.opcode);
 		write("\t");
-		write(cformat(curr.format_string, mem.program[pc .. pc+curr.size]));
+		write(cformat(curr.format_string, mem.memory[pc .. pc+curr.size]));
 		writeln;
 
 		// skip over arguments

@@ -1,18 +1,22 @@
 import CPU;
 
 struct Opcode {
-	void function(State state, ubyte opcode, ubyte[] args) fun;
+	// returns <0 if there was no answer, otherwise returns the answer
+	short function(State state, ubyte opcode, ubyte[] args) fun;
 	string opcode;
 	string format_string;
 	ubyte size; // number of arguments after the opcode
 	bool invalid;
 }
 
-void un_impl(State state, ubyte opcode, ubyte[] args) {
+short un_impl(State state, ubyte opcode, ubyte[] args) {
 	import std.stdio;
-	writefln("Unimplemented opcode!");
+	writefln("Unimplemented opcode %s!", cformat(opcodes[opcode].opcode ~ " " ~ opcodes[opcode].format_string, args));
+	return -1;
 }
-void nop(State state, ubyte opcode, ubyte[] args) {}
+short nop(State state, ubyte opcode, ubyte[] args) {
+	return -1;
+}
 
 // custom formatter.  Just accepts '%!' by itself (or %% to escape)
 Opcode[] opcodes = [
@@ -22,7 +26,7 @@ Opcode[] opcodes = [
 	/*0x03: */Opcode(&un_impl, "INX B"),
 	/*0x04: */Opcode(&un_impl, "INR B"),
 	/*0x05: */Opcode(&un_impl, "DCR B"),
-	/*0x06: */Opcode(&un_impl, "MVI", "B,#$%!", 1),
+	/*0x06: */Opcode(&un_impl, "MVI", "B,#0x%!", 1),
 	/*0x07: */Opcode(&un_impl, "RLC"),
 	/*0x08: */Opcode(&nop, "NOP"),
 	/*0x09: */Opcode(&un_impl, "DAD B"),
@@ -78,7 +82,7 @@ Opcode[] opcodes = [
 	/*0x3b: */Opcode(&un_impl, "DCX SP"),
 	/*0x3c: */Opcode(&un_impl, "INR A"),
 	/*0x3d: */Opcode(&un_impl, "DCR A"),
-	/*0x3e: */Opcode(&un_impl, "MVI", "A,#$%!", 1),
+	/*0x3e: */Opcode(&un_impl, "MVI", "A,#0x%!", 1),
 	/*0x3f: */Opcode(&un_impl, "CMC"),
 	/*0x40: */Opcode(&un_impl, "MOV", "B,B"),
 	/*0x41: */Opcode(&un_impl, "MOV", "B,C"),
