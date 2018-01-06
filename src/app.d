@@ -13,6 +13,6 @@ void main(string[] args) {
 	s.mem.memory[0x1000 .. 0x17ff + 1] = cast(ubyte[])read("roam/invaders.f");
 	s.mem.memory[0x1800 .. 0x1fff + 1] = cast(ubyte[])read("roam/invaders.e");
 
-	print_dissasembly(s.mem);
-	//run(s);
+	//print_dissasembly(s.mem);
+	run(s);
 }

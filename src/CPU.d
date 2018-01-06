@@ -33,6 +33,16 @@ string cformat(in string str, ubyte[] args) {
 	return ret;
 }
 
+enum Conditions {
+	none = 0x0,
+	z = 0x1,
+	s = 0x2,
+	p = 0x4,
+	cy = 0x8,
+	ac = 0xf,
+
+	all = z | s | p | cy | ac
+}
 struct Condition {
 	bool z, s, p, cy, ac;
 }
@@ -57,13 +67,20 @@ class State {
 }
 
 
-void set_condition(State state, short ans) {
-	state.condition.z = ((ans & 0xff) == 0);
-	state.condition.s = ((ans & 0x80) != 0);
-//	state.condition.p = Parity(ans&0xff);
-	state.condition.cy = (ans > 0xff);
+void set_conditions(State state, ushort ans, Conditions conditions) {
+	if (conditions & Conditions.z) {
+		state.condition.z = ((ans & 0xff) == 0);
+	}
+	if (conditions & Conditions.s) {
+		state.condition.s = ((ans & 0x80) != 0);
+	}
+	if (conditions & Conditions.p) {
+		state.condition.p = !((ans&0xff) & 0x1);
+	}
+	if (conditions & Conditions.cy) {
+		state.condition.cy = (ans > 0xff);
+	}
 //	state.condition.ac = (ans & 0xff) != 0;
-//	state.condition.a = ans & 0xff;
 }
 
 
@@ -81,13 +98,10 @@ void run(State state) {
 
 		ans = curr.fun(state, opcode, opargs);
 
-		if (ans >= 0) {
-			set_condition(state, ans);
-			state.mem.a = ans & 0xff;
-		}
+		set_conditions(state, ans, curr.cccodes_set);
+		//state.mem.a = ans & 0xff;
 	}
 }
-
 
 
 
