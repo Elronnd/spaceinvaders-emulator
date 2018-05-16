@@ -51,22 +51,22 @@ struct Mem {
 	ubyte a;
 	union {
 		struct {
-			ubyte b;
 			ubyte c;
+			ubyte b;
 		}
 		ushort bc;
 	}
 	union {
 		struct {
-			ubyte d;
 			ubyte e;
+			ubyte d;
 		}
 		ushort de;
 	}
 	union {
 		struct {
-			ubyte h;
 			ubyte l;
+			ubyte h;
 		}
 		ushort hl;
 	}
@@ -85,6 +85,7 @@ struct Mem {
 class State {
 	Mem mem;
 	Condition condition;
+	bool interrupt_enabled;
 }
 
 
@@ -96,7 +97,7 @@ void set_conditions(State state, ushort ans, Conditions conditions) {
 		state.condition.s = ((ans & 0x80) != 0);
 	}
 	if (conditions & Conditions.p) {
-		state.condition.p = !((ans&0xff) & 0x1);
+		state.condition.p = !((ans&0xff) & 1);
 	}
 	if (conditions & Conditions.cy) {
 		state.condition.cy = (ans > 0xff);
@@ -110,7 +111,7 @@ void run(State state) {
 	opcodes.Opcode curr;
 	ubyte opcode;
 	ubyte[] opargs;
-	short ans;
+	ushort ans;
 
 	while (state.mem.pc < state.mem.memory.length /* 0x1fff */ /* || true */) {
 		opcode = state.mem.memory[state.mem.pc++];
@@ -120,44 +121,53 @@ void run(State state) {
 		ans = curr.fun(state, opcode, opargs);
 
 		set_conditions(state, ans, curr.cccodes_set);
-		//state.mem.a = ans & 0xff;
 	}
 }
 
 
+void disasemble_instr(Mem mem, ushort pc) {
+	opcodes.Opcode op;
+	//writefln("Disassembling at memory location %s which is %s", pc, mem.memory[pc]);
+	writef("%04x: ", pc);
+
+	op = opcodes.opcodes[mem.memory[pc]];
+
+	{
+		import std.string: format;
+
+		string hex = format("%02x", mem.memory[pc++]);
+
+		// write out hex
+		foreach (i; 0 .. op.size) {
+			hex ~= format(" %02x", mem.memory[pc+i]);
+		}
+		writef("%-8s", hex); // max 8 characters (6 hex, plus 2 spaces, plus some padding
+		// - left-aligns
+	}
+
+	write("\t\t"); // padding
+
+
+	// write dissassembly
+	write(op.opcode);
+	write("\t");
+	write(cformat(op.format_string, mem.memory[pc .. pc+op.size]));
+}
+
 
 void print_dissasembly(Mem mem) {
-	ushort pc; // make our own, to avoid disrupting Mem's
-	opcodes.Opcode curr;
+	// use our own pc, to avoid disrupting mem's
+	ushort pc = 0;
 
 	while (pc < mem.memory.length /* 0x1fff */) {
-		writef("%04x: ", pc);
+		//writefln("Pc: %s", pc);
+		disasemble_instr(mem, pc);
 
-		curr = opcodes.opcodes[mem.memory[pc]];
-
-		{
-			import std.string: format;
-
-			string hex = format("%02x", mem.memory[pc++]);
-
-			// write out hex
-			foreach (i; 0 .. curr.size) {
-				hex ~= format(" %02x", mem.memory[pc+i]);
-			}
-			writef("%-8s", hex); // max 8 characters (6 hex, plus 2 spaces, plus some padding
-			// - left-aligns
-		}
-
-		write("\t\t"); // padding
-
-
-		// write dissassembly
-		write(curr.opcode);
-		write("\t");
-		write(cformat(curr.format_string, mem.memory[pc .. pc+curr.size]));
 		writeln;
 
-		// skip over arguments
-		pc += curr.size;
+		// skip over arguments and instruction
+		//writefln("Adding %s to pc from %s", opcodes.opcodes[mem.memory[pc]].size + 1, opcodes.opcodes[mem.memory[pc]]);
+		pc += opcodes.opcodes[mem.memory[pc]].size + 1;
+		//nwritefln("PC is now %s", pc);
 	}
 }

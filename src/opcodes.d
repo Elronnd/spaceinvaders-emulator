@@ -1,4 +1,5 @@
 import CPU;
+import std.algorithm.mutation: swap;
 
 alias Opfun = ushort function(State state, ubyte opcode, ubyte[] args);
 
@@ -169,8 +170,98 @@ Opfun genldax(string from)() {
 	return (State state, ubyte opcode, ubyte[] args) {
 		state.mem.a = state.mem.memory[mixin(q{state.mem.} ~ from)];
 		return cast(ushort)0;
-	}
+	};
 }
+Opfun genana(char from)() {
+	return (State state, ubyte opcode, ubyte[] args) {
+		static if (from == 'm') {
+			ushort ret = state.mem.a & state.mem.memory[state.mem.hl];
+		} else {
+			ushort ret = state.mem.a & mixin(q{state.mem.} ~ from);
+		}
+		state.mem.a = ret & 0xff;
+		return ret;
+	};
+}
+Opfun genxra(char from)() {
+	return (State state, ubyte opcode, ubyte[] args) {
+		static if (from == 'm') {
+			ushort ret = state.mem.a ^ state.mem.memory[state.mem.hl];
+		} else {
+			ushort ret = state.mem.a ^ mixin(q{state.mem.} ~ from);
+		}
+		state.mem.a = ret & 0xff;
+		return ret;
+	};
+}
+Opfun genora(char from)() {
+	return (State state, ubyte opcode, ubyte[] args) {
+		static if (from == 'm') {
+			ushort ret = state.mem.a | state.mem.memory[state.mem.hl];
+		} else {
+			ushort ret = state.mem.a | mixin(q{state.mem.} ~ from);
+		}
+		state.mem.a = ret & 0xff;
+		return ret;
+	};
+}
+Opfun gencjmp(string from, bool expected)() {
+	return (State state, ubyte opcode, ubyte[] args) {
+		if (mixin(q{state.condition.} ~ from) == expected) {
+			state.mem.pc = (args[1] << 8) | args[0];
+		}
+		return cast(ushort)0;
+	};
+}
+Opfun genccall(string from, bool expected)() {
+	return (State state, ubyte opcode, ubyte[] args) {
+		if (mixin(q{state.condition.} ~ from) == expected) {
+			state.call((args[1] << 8) | args[0]);
+		}
+		return cast(ushort)0;
+	};
+}
+Opfun gencret(string from, bool expected)() {
+	return (State state, ubyte opcode, ubyte[] args) {
+		if (mixin(q{state.condition.} ~ from) == expected) {
+			state.ret;
+		}
+		return cast(ushort)0;
+	};
+}
+void push(State state, ubyte value) {
+	state.mem.memory[--state.mem.pc] = value;
+}
+ubyte pop(State state) {
+	return state.mem.memory[state.mem.pc++];
+}
+void call(State state, ushort addr) {
+	state.push(addr >> 8);
+	state.push(addr & 0xff);
+	state.mem.pc = addr;
+}
+void ret(State state) {
+	ubyte lo, hi;
+	lo = state.pop;
+	hi = state.pop; // order of evaluation is undefined
+	state.mem.pc = (hi << 8) | lo;
+}
+Opfun genrst(ushort target_addr)() {
+	return (State state, ubyte opcode, ubyte[] args) {
+		state.call(target_addr);
+		return cast(ushort)0;
+	};
+}
+Opfun gencmp(char target)() {
+	return (State state, ubyte opcode, ubyte[] args) {
+		static if (target == 'm') {
+			return cast(ushort)(state.mem.a - state.mem.memory[state.mem.hl]);
+		} else {
+			return cast(ushort)(state.mem.a - mixin(q{state.mem.} ~ target));
+		}
+	};
+}
+
 
 
 // custom formatter.  Just accepts '%!' by itself (or %% to escape)
@@ -198,7 +289,7 @@ Opcode[] opcodes = [
 	/*0x14: */{geninr!'d', "INR D", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x15: */{gendcr!'d', "DCR D", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x16: */{genmvi!'d', "MVI", "D,#$%!", 1},
-	/*0x17: */{&un_impl, "RAL"},
+	/*0x17: */{(State state, ubyte opcode, ubyte[] args) { /* Yeah I have no idea wtf is going on with this opcode */ bool newcy = cast(bool)(state.mem.a & 0b10000000); state.mem.a = cast(ubyte)(((state.mem.a << 1)&0xff) | state.condition.cy); state.condition.cy = newcy; return cast(ushort)0; }, "RAL"},
 	/*0x18: */{&nop, "NOP"},
 	/*0x19: */{gendad!"de", "DAD D", cccodes_set:Conditions.cy},
 	/*0x1a: */{genldax!"de", "LDAX D"},
@@ -206,10 +297,10 @@ Opcode[] opcodes = [
 	/*0x1c: */{geninr!'e', "INR E", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x1d: */{gendcr!'e', "DCR E", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x1e: */{genmvi!'e', "MVI", "E,#$%!", 1},
-	/*0x1f: */{&un_impl, "RAR"},
-	/*0x20: */{&un_impl, "RIM"},
+	/*0x1f: */{(State state, ubyte opcode, ubyte[] args) { /* This one is even weirder.  Basically treat the bottom 7 bits of a and the carry bit all together as a byte, and right shift????????? */ ubyte bit7 = state.mem.a & 0b10000000; bool bit0 = state.mem.a & 0b00000001; state.mem.a = (state.mem.a >> 1) | bit7; state.condition.cy = bit0; return cast(ushort)0; }, "RAR"},
+	/*0x20: */{&un_impl, "RIM"}, // "special".  Whatever the hell that means.
 	/*0x21: */{genlxi!"hl", "LXI", "H,#$%1%0", 2},
-	/*0x22: */{&un_impl, "SHLD", "TODO what the fuck (adr) <-L; (adr+1)<-H", 2},
+	/*0x22: */{(State state, ubyte opcode, ubyte[] args) { ushort ptr = (args[1] << 8) | args[0]; state.mem.memory[ptr] = state.mem.l; state.mem.memory[ptr+1] = state.mem.h; return cast(ushort)0; }, "SHLD", "#$%1%0 = LH", 2},
 	/*0x23: */{geninx!"h", "INX H"},
 	/*0x24: */{geninr!'h', "INR H", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x25: */{gendcr!'h', "DCR H", cccodes_set:Conditions.all & ~(Conditions.cy)},
@@ -217,28 +308,28 @@ Opcode[] opcodes = [
 	/*0x27: */{&un_impl, "DAA", "special"},
 	/*0x28: */{&nop, "NOP"},
 	/*0x29: */{gendad!"hl", "DAD H", cccodes_set:Conditions.cy},
-	/*0x2a: */{&un_impl, "LHLD", "TODO what the fuck (same as SHDL"},
+	/*0x2a: */{(State state, ubyte opcode, ubyte[] args) { ushort ptr = (args[1] << 8) | args[0]; state.mem.l = state.mem.memory[ptr]; state.mem.h = state.mem.memory[ptr+1]; return cast(ushort)0; }, "LHLD", "LH = #$%1%0"},
 	/*0x2b: */{gendcx!"h", "DCX H"},
 	/*0x2c: */{geninr!'l', "INR L", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x2d: */{gendcr!'l', "DCR L", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x2e: */{genmvi!'l', "MVI", "L,#$%!", 1},
-	/*0x2f: */{&un_impl, "CMA"},
+	/*0x2f: */{(State state, ubyte opcode, ubyte[] args) { state.mem.a = ~state.mem.a; return cast(ushort)0; }, "CMA"},
 	/*0x30: */{&un_impl, "SIM", "special"},
 	/*0x31: */{genlxi!"sp", "LXI", "SP,#$%1%0", 2},
-	/*0x32: */{&un_impl, "STA", "$%1%0", 2},
+	/*0x32: */{(State state, ubyte opcode, ubyte[] args) { state.mem.memory[(args[1] << 8) | args[0]] = state.mem.a; return cast(ushort)0; }, "STA", "$%1%0", 2},
 	/*0x33: */{geninx!"sp", "INX", "SP"},
 	/*0x34: */{geninr!'m', "INR M", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x35: */{gendcr!'m', "DCR M", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x36: */{genmvi!'m', "MVI", "M,#$%!", 1},
-	/*0x37: */{&un_impl, "STC"},
+	/*0x37: */{(State state, ubyte opcode, ubyte[] args) { /* Why TF is this SeT Carry instead of STore C???  Be consistent, intel!! */ state.condition.cy = true; return cast(ushort)0; }, "STC"},
 	/*0x38: */{&nop, "NOP"},
 	/*0x39: */{gendad!"sp", "DAD SP", cccodes_set:Conditions.cy},
-	/*0x3a: */{&un_impl, "LDA", "$%1%0", 2},
+	/*0x3a: */{(State state, ubyte opcode, ubyte[] args) { state.mem.a = state.mem.memory[(args[1] << 8) | args[0]]; return cast(ushort)0; }, "LDA", "$%1%0", 2},
 	/*0x3b: */{gendcx!"sp", "DCX SP"},
 	/*0x3c: */{geninr!'a', "INR A", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x3d: */{gendcr!'a', "DCR A", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x3e: */{genmvi!'a', "MVI", "A,#0x%!", 1},
-	/*0x3f: */{&un_impl, "CMC"},
+	/*0x3f: */{(State state, ubyte opcode, ubyte[] args) { state.condition.cy = !state.condition.cy; return cast(ushort)0; }, "CMC"},
 	/*0x40: */{genmov!('b', 'b'), "MOV", "B,B"},
 	/*0x41: */{genmov!('b', 'c'), "MOV", "B,C"},
 	/*0x42: */{genmov!('b', 'd'), "MOV", "B,D"},
@@ -319,116 +410,116 @@ Opcode[] opcodes = [
 	/*0x8d: */{genadc!'l', "ADC", "L", cccodes_set:Conditions.all},
 	/*0x8e: */{genadc!'m', "ADC", "M", cccodes_set:Conditions.all},
 	/*0x8f: */{genadc!'a', "ADC", "A", cccodes_set:Conditions.all},
-	/*0x90: */{gensub!'b', "SUB", "B"},
-	/*0x91: */{gensub!'c', "SUB", "C"},
-	/*0x92: */{gensub!'d', "SUB", "D"},
-	/*0x93: */{gensub!'e', "SUB", "E"},
-	/*0x94: */{gensub!'h', "SUB", "H"},
-	/*0x95: */{gensub!'l', "SUB", "L"},
-	/*0x96: */{gensub!'m', "SUB", "M"},
-	/*0x97: */{gensub!'a', "SUB", "A"},
-	/*0x98: */{gensbb!'b', "SBB", "B"},
-	/*0x99: */{gensbb!'c', "SBB", "C"},
-	/*0x9a: */{gensbb!'d', "SBB", "D"},
-	/*0x9b: */{gensbb!'e', "SBB", "E"},
-	/*0x9c: */{gensbb!'h', "SBB", "H"},
-	/*0x9d: */{gensbb!'l', "SBB", "L"},
-	/*0x9e: */{gensbb!'m', "SBB", "M"},
-	/*0x9f: */{gensbb!'a', "SBB", "A"},
-	/*0xa0: */{&un_impl, "ANA", "B"},
-	/*0xa1: */{&un_impl, "ANA", "C"},
-	/*0xa2: */{&un_impl, "ANA", "D"},
-	/*0xa3: */{&un_impl, "ANA", "E"},
-	/*0xa4: */{&un_impl, "ANA", "H"},
-	/*0xa5: */{&un_impl, "ANA", "L"},
-	/*0xa6: */{&un_impl, "ANA", "M"},
-	/*0xa7: */{&un_impl, "ANA", "A"},
-	/*0xa8: */{&un_impl, "XRA", "B"},
-	/*0xa9: */{&un_impl, "XRA", "C"},
-	/*0xaa: */{&un_impl, "XRA", "D"},
-	/*0xab: */{&un_impl, "XRA", "E"},
-	/*0xac: */{&un_impl, "XRA", "H"},
-	/*0xad: */{&un_impl, "XRA", "L"},
-	/*0xae: */{&un_impl, "XRA", "M"},
-	/*0xaf: */{&un_impl, "XRA", "A"},
-	/*0xb0: */{&un_impl, "ORA", "B"},
-	/*0xb1: */{&un_impl, "ORA", "C"},
-	/*0xb2: */{&un_impl, "ORA", "D"},
-	/*0xb3: */{&un_impl, "ORA", "E"},
-	/*0xb4: */{&un_impl, "ORA", "H"},
-	/*0xb5: */{&un_impl, "ORA", "L"},
-	/*0xb6: */{&un_impl, "ORA", "M"},
-	/*0xb7: */{&un_impl, "ORA", "A"},
-	/*0xb8: */{&un_impl, "CMP", "B"},
-	/*0xb9: */{&un_impl, "CMP", "C"},
-	/*0xba: */{&un_impl, "CMP", "D"},
-	/*0xbb: */{&un_impl, "CMP", "E"},
-	/*0xbc: */{&un_impl, "CMP", "H"},
-	/*0xbd: */{&un_impl, "CMP", "L"},
-	/*0xbe: */{&un_impl, "CMP", "M"},
-	/*0xbf: */{&un_impl, "CMP", "A"},
-	/*0xc0: */{&un_impl, "RNZ"},
-	/*0xc1: */{&un_impl, "POP", "B"},
-	/*0xc2: */{&un_impl, "JNZ", "$%1%0", 2},
-	/*0xc3: */{&un_impl, "JMP", "$%1%0", 2},
-	/*0xc4: */{&un_impl, "CNZ", "$%1%0", 2},
-	/*0xc5: */{&un_impl, "PUSH", "B"},
+	/*0x90: */{gensub!'b', "SUB", "B", cccodes_set:Conditions.all},
+	/*0x91: */{gensub!'c', "SUB", "C", cccodes_set:Conditions.all},
+	/*0x92: */{gensub!'d', "SUB", "D", cccodes_set:Conditions.all},
+	/*0x93: */{gensub!'e', "SUB", "E", cccodes_set:Conditions.all},
+	/*0x94: */{gensub!'h', "SUB", "H", cccodes_set:Conditions.all},
+	/*0x95: */{gensub!'l', "SUB", "L", cccodes_set:Conditions.all},
+	/*0x96: */{gensub!'m', "SUB", "M", cccodes_set:Conditions.all},
+	/*0x97: */{gensub!'a', "SUB", "A", cccodes_set:Conditions.all},
+	/*0x98: */{gensbb!'b', "SBB", "B", cccodes_set:Conditions.all},
+	/*0x99: */{gensbb!'c', "SBB", "C", cccodes_set:Conditions.all},
+	/*0x9a: */{gensbb!'d', "SBB", "D", cccodes_set:Conditions.all},
+	/*0x9b: */{gensbb!'e', "SBB", "E", cccodes_set:Conditions.all},
+	/*0x9c: */{gensbb!'h', "SBB", "H", cccodes_set:Conditions.all},
+	/*0x9d: */{gensbb!'l', "SBB", "L", cccodes_set:Conditions.all},
+	/*0x9e: */{gensbb!'m', "SBB", "M", cccodes_set:Conditions.all},
+	/*0x9f: */{gensbb!'a', "SBB", "A", cccodes_set:Conditions.all},
+	/*0xa0: */{genana!'b', "ANA", "B", cccodes_set:Conditions.all},
+	/*0xa1: */{genana!'c', "ANA", "C", cccodes_set:Conditions.all},
+	/*0xa2: */{genana!'d', "ANA", "D", cccodes_set:Conditions.all},
+	/*0xa3: */{genana!'e', "ANA", "E", cccodes_set:Conditions.all},
+	/*0xa4: */{genana!'h', "ANA", "H", cccodes_set:Conditions.all},
+	/*0xa5: */{genana!'l', "ANA", "L", cccodes_set:Conditions.all},
+	/*0xa6: */{genana!'m', "ANA", "M", cccodes_set:Conditions.all},
+	/*0xa7: */{genana!'a', "ANA", "A", cccodes_set:Conditions.all},
+	/*0xa8: */{genxra!'b', "XRA", "B", cccodes_set:Conditions.all},
+	/*0xa9: */{genxra!'c', "XRA", "C", cccodes_set:Conditions.all},
+	/*0xaa: */{genxra!'d', "XRA", "D", cccodes_set:Conditions.all},
+	/*0xab: */{genxra!'e', "XRA", "E", cccodes_set:Conditions.all},
+	/*0xac: */{genxra!'h', "XRA", "H", cccodes_set:Conditions.all},
+	/*0xad: */{genxra!'l', "XRA", "L", cccodes_set:Conditions.all},
+	/*0xae: */{genxra!'m', "XRA", "M", cccodes_set:Conditions.all},
+	/*0xaf: */{genxra!'a', "XRA", "A", cccodes_set:Conditions.all},
+	/*0xb0: */{genora!'b', "ORA", "B", cccodes_set:Conditions.all},
+	/*0xb1: */{genora!'c', "ORA", "C", cccodes_set:Conditions.all},
+	/*0xb2: */{genora!'d', "ORA", "D", cccodes_set:Conditions.all},
+	/*0xb3: */{genora!'e', "ORA", "E", cccodes_set:Conditions.all},
+	/*0xb4: */{genora!'h', "ORA", "H", cccodes_set:Conditions.all},
+	/*0xb5: */{genora!'l', "ORA", "L", cccodes_set:Conditions.all},
+	/*0xb6: */{genora!'m', "ORA", "M", cccodes_set:Conditions.all},
+	/*0xb7: */{genora!'a', "ORA", "A", cccodes_set:Conditions.all},
+	/*0xb8: */{gencmp!'b', "CMP", "B", cccodes_set:Conditions.all},
+	/*0xb9: */{gencmp!'c', "CMP", "C", cccodes_set:Conditions.all},
+	/*0xba: */{gencmp!'d', "CMP", "D", cccodes_set:Conditions.all},
+	/*0xbb: */{gencmp!'e', "CMP", "E", cccodes_set:Conditions.all},
+	/*0xbc: */{gencmp!'h', "CMP", "H", cccodes_set:Conditions.all},
+	/*0xbd: */{gencmp!'l', "CMP", "L", cccodes_set:Conditions.all},
+	/*0xbe: */{gencmp!'m', "CMP", "M", cccodes_set:Conditions.all},
+	/*0xbf: */{gencmp!'a', "CMP", "A", cccodes_set:Conditions.all},
+	/*0xc0: */{gencret!("z", false), "RNZ"},
+	/*0xc1: */{(State state, ubyte opcode, ubyte[] args) { state.mem.c = state.pop; state.mem.b = state.pop; return cast(ushort)0; }, "POP", "B"},
+	/*0xc2: */{gencjmp!("z", false), "JNZ", "$%1%0", 2},
+	/*0xc3: */{(State state, ubyte opcode, ubyte[] args) { state.mem.pc = (args[1] << 8) | args[0]; return cast(ushort)0; }, "JMP", "$%1%0", 2},
+	/*0xc4: */{genccall!("z", false), "CNZ", "$%1%0", 2},
+	/*0xc5: */{(State state, ubyte opcode, ubyte[] args) { state.push(state.mem.b); state.push(state.mem.c); return cast(ushort)0; }, "PUSH", "B"},
 	/*0xc6: */{&ADI, "ADI", "#$%!", 1, cccodes_set:Conditions.all},
-	/*0xc7: */{&un_impl, "RST 0"},
-	/*0xc8: */{&un_impl, "RZ"},
-	/*0xc9: */{&un_impl, "RET"},
-	/*0xca: */{&un_impl, "JZ", "$%1%0", 2},
+	/*0xc7: */{genrst!0, "RST 0"},
+	/*0xc8: */{gencret!("z", true), "RZ"},
+	/*0xc9: */{(State state, ubyte opcode, ubyte[] args) { state.ret; return cast(ushort)0; }, "RET"},
+	/*0xca: */{gencjmp!("z", true), "JZ", "$%1%0", 2},
 	/*0xcb: */{&nop, "NOP"},
-	/*0xcc: */{&un_impl, "CZ", "$%1%0", 2},
-	/*0xcd: */{&un_impl, "CALL", "$%1%0", 2},
+	/*0xcc: */{genccall!("z", true), "CZ", "$%1%0", 2},
+	/*0xcd: */{(State state, ubyte opcode, ubyte[] args) { state.call((args[1] << 8) | args[0]); return cast(ushort)0; }, "CALL", "$%1%0", 2},
 	/*0xce: */{&ACI, "ACI", "#$%!", 1},
-	/*0xcf: */{&un_impl, "RST", "1"},
-	/*0xd0: */{&un_impl, "RNC"},
-	/*0xd1: */{&un_impl, "POP", "D"},
-	/*0xd2: */{&un_impl, "JNC", "$%1%0", 2},
+	/*0xcf: */{genrst!0x8, "RST", "1"},
+	/*0xd0: */{gencret!("cy", false), "RNC"},
+	/*0xd1: */{(State state, ubyte opcode, ubyte[] args) { state.mem.e = state.pop; state.mem.d = state.pop; return cast(ushort)0; }, "POP", "D"},
+	/*0xd2: */{gencjmp!("cy", false), "JNC", "$%1%0", 2},
 	/*0xd3: */{&un_impl, "OUT", "Special?  %!", 1},
-	/*0xd4: */{&un_impl, "CNC", "$%1%0", 2},
-	/*0xd5: */{&un_impl, "PUSH", "D"},
+	/*0xd4: */{genccall!("cy", false), "CNC", "$%1%0", 2},
+	/*0xd5: */{(State state,  ubyte opcode, ubyte[] args) { state.push(state.mem.d); state.push(state.mem.e); return cast(ushort)0; }, "PUSH", "D"},
 	/*0xd6: */{&SUI, "SUI", "#$%!", 1},
-	/*0xd7: */{&un_impl, "RST", "2"},
-	/*0xd8: */{&un_impl, "RC"},
+	/*0xd7: */{genrst!0x10, "RST", "2"},
+	/*0xd8: */{gencret!("cy", true), "RC"},
 	/*0xd9: */{&nop, "NOP"},
-	/*0xda: */{&un_impl, "JC", "$%1%0", 2},
+	/*0xda: */{gencjmp!("cy", true), "JC", "$%1%0", 2},
 	/*0xdb: */{&un_impl, "IN", "#$%! (special)", 1},
-	/*0xdc: */{&un_impl, "CC", "$%1%0", 2},
+	/*0xdc: */{genccall!("cy", true), "CC", "$%1%0", 2},
 	/*0xdd: */{&nop, "NOP"},
 	/*0xde: */{&un_impl, "SBI", "#$%!", 1},
-	/*0xdf: */{&un_impl, "RST 3"},
-	/*0xe0: */{&un_impl, "RPO"},
-	/*0xe1: */{&un_impl, "POP H"},
-	/*0xe2: */{&un_impl, "JPO", "$%1%0", 2},
-	/*0xe3: */{&un_impl, "XTHL"},
-	/*0xe4: */{&un_impl, "CPO", "$%1%0", 2},
-	/*0xe5: */{&un_impl, "PUSH", "H"},
-	/*0xe6: */{&un_impl, "ANI", "#$%!", 1},
-	/*0xe7: */{&un_impl, "RST 4"},
-	/*0xe8: */{&un_impl, "RPE"},
-	/*0xe9: */{&un_impl, "PCHL"},
-	/*0xea: */{&un_impl, "JPE", "$%1%0", 2},
-	/*0xeb: */{&un_impl, "XCHG"},
-	/*0xec: */{&un_impl, "CPE", "$%1%0", 2},
+	/*0xdf: */{genrst!0x18, "RST 3"},
+	/*0xe0: */{gencret!("p", false), "RPO"},
+	/*0xe1: */{(State state, ubyte opcode, ubyte[] args) { state.mem.l = state.pop; state.mem.h = state.pop; return cast(ushort)0; }, "POP H"},
+	/*0xe2: */{gencjmp!("p", false), "JPO", "$%1%0", 2},
+	/*0xe3: */{(State state, ubyte opcode, ubyte[] args) { ubyte h = state.mem.h; ubyte l = state.mem.l; state.mem.l = state.pop; state.mem.h = state.pop; state.push(h); state.push(l); return cast(ushort)0; }, "XTHL"},
+	/*0xe4: */{genccall!("p", false), "CPO", "$%1%0", 2},
+	/*0xe5: */{(State state, ubyte opcode, ubyte[] args) { state.push(state.mem.h); state.push(state.mem.l); return cast(ushort)0; }, "PUSH", "H"},
+	/*0xe6: */{(State state, ubyte opcode, ubyte[] args) { state.mem.a &= args[0]; return state.mem.a; }, "ANI", "#$%!", 1},
+	/*0xe7: */{genrst!0x20, "RST 4"},
+	/*0xe8: */{gencret!("p", true), "RPE"},
+	/*0xe9: */{(State state, ubyte opcode, ubyte[] args) { state.mem.pc = state.mem.hl; return cast(ushort)0; }, "PCHL"},
+	/*0xea: */{gencjmp!("p", true), "JPE", "$%1%0", 2},
+	/*0xeb: */{(State state, ubyte opcode, ubyte[] args) { swap(state.mem.hl, state.mem.de); return cast(ushort)0; }, "XCHG"},
+	/*0xec: */{genccall!("p", true), "CPE", "$%1%0", 2},
 	/*0xed: */{&nop, "NOP"},
 	/*0xee: */{&un_impl, "XRI", "#$%!", 1},
-	/*0xef: */{&un_impl, "RST", "5"},
-	/*0xf0: */{&un_impl, "RP"},
-	/*0xf1: */{&un_impl, "POP", "PSW"},
-	/*0xf2: */{&un_impl, "JP", "$%1%0", 2},
-	/*0xf3: */{&un_impl, "DI"},
-	/*0xf4: */{&un_impl, "CP", "$%1%0", 2},
-	/*0xf5: */{&un_impl, "PUSH", "PSW"},
+	/*0xef: */{genrst!0x28, "RST", "5"},
+	/*0xf0: */{gencret!("s", false), "RP"},
+	/*0xf1: */{(State state, ubyte opcode, ubyte[] args) { ubyte flags = state.pop; state.mem.a = state.pop; state.condition.cy = flags & 1; state.condition.p = cast(bool)(flags & 0b00000100); state.condition.ac = cast(bool)(flags & 0b00010000); state.condition.z = cast(bool)(flags & 0b01000000); state.condition.s = cast(bool)(flags & 0b10000000); return cast(ushort)0; }, "POP", "PSW"},
+	/*0xf2: */{gencjmp!("s", false), "JP", "$%1%0", 2},
+	/*0xf3: */{(State state, ubyte opcode, ubyte[] args) { state.interrupt_enabled = false; return cast(ushort)0; }, "DI"},
+	/*0xf4: */{genccall!("s", false), "CP", "$%1%0", 2},
+	/*0xf5: */{(State state, ubyte opcode, ubyte[] args) { state.push(state.mem.a); state.push(state.condition.cy | (1 << 1) | (state.condition.p << 2) | (0 << 3) | (state.condition.ac << 4) | (0 << 5) | (state.condition.z << 6) | (state.condition.s << 7)); return cast(ushort)0; }, "PUSH", "PSW"},
 	/*0xf6: */{&un_impl, "ORI", "#$%!", 1},
-	/*0xf7: */{&un_impl, "RST", "6"},
-	/*0xf8: */{&un_impl, "RM"},
-	/*0xf9: */{&un_impl, "SPHL"},
-	/*0xfa: */{&un_impl, "JM", "$%1%0", 2},
-	/*0xfb: */{&un_impl, "EI"},
-	/*0xfc: */{&un_impl, "CM", "$%1%0", 2},
+	/*0xf7: */{genrst!0x30, "RST", "6"},
+	/*0xf8: */{gencret!("s", true), "RM"},
+	/*0xf9: */{(State state, ubyte opcode, ubyte[] args) { state.mem.sp = state.mem.hl; return cast(ushort)0; }, "SPHL"},
+	/*0xfa: */{gencjmp!("s", true), "JM", "$%1%0", 2},
+	/*0xfb: */{(State state, ubyte opcode, ubyte[] args) { state.interrupt_enabled = true; return cast(ushort)0; }, "EI"},
+	/*0xfc: */{genccall!("s", true), "CM", "$%1%0", 2},
 	/*0xfd: */{&nop, "NOP"},
-	/*0xfe: */{&un_impl, "CPI", "#$%!", 1},
-	/*0xff: */{&un_impl, "RST", "7"},
+	/*0xfe: */{(State state, ubyte opcode, ubyte[] args) { state.condition.cy = state.mem.a < args[0]; ubyte x = cast(ubyte)(state.mem.a - args[0]); return x; }, "CPI", "#$%!", 1, cccodes_set:Conditions.all & ~(Conditions.cy)},
+	/*0xff: */{genrst!0x38, "RST", "7"},
 	];
