@@ -48,7 +48,28 @@ struct Condition {
 }
 struct Mem {
 	// registers
-	ubyte a, b, c, d, e, h, l;
+	ubyte a;
+	union {
+		struct {
+			ubyte b;
+			ubyte c;
+		}
+		ushort bc;
+	}
+	union {
+		struct {
+			ubyte d;
+			ubyte e;
+		}
+		ushort de;
+	}
+	union {
+		struct {
+			ubyte h;
+			ubyte l;
+		}
+		ushort hl;
+	}
 
 	// memory space, including the program
 	ubyte[] memory;
@@ -102,7 +123,6 @@ void run(State state) {
 		//state.mem.a = ans & 0xff;
 	}
 }
-
 
 
 
