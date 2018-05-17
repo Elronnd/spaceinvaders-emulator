@@ -236,8 +236,8 @@ ubyte pop(State state) {
 	return state.mem.memory[state.mem.sp++];
 }
 void call(State state, ushort addr) {
-	state.push(addr >> 8);
-	state.push(addr & 0xff);
+	state.push(state.mem.pc >> 8);
+	state.push(state.mem.pc & 0xff);
 	state.mem.pc = addr;
 }
 void ret(State state) {
@@ -269,7 +269,7 @@ immutable Opcode[] opcodes = [
 	/*0x00: */{&nop, "NOP"},
 	/*0x01: */{genlxi!"bc", "LXI", "B,#$%1%0", 2},
 	/*0x02: */{genstax!"bc", "STAX B"},
-	/*0x03: */{geninx!"b", "INX B"},
+	/*0x03: */{geninx!"bc", "INX BC"},
 	/*0x04: */{geninr!'b', "INR B", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x05: */{gendcr!'b', "DCR B", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x06: */{genmvi!'b', "MVI", "B,#0x%!", 1},
@@ -285,7 +285,7 @@ immutable Opcode[] opcodes = [
 	/*0x10: */{&nop, "NOP"},
 	/*0x11: */{genlxi!"de", "LXI", "D,#$%1%0", 2},
 	/*0x12: */{genstax!"de", "STAX D"},
-	/*0x13: */{geninx!"d", "INX D"},
+	/*0x13: */{geninx!"de", "INX DE"},
 	/*0x14: */{geninr!'d', "INR D", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x15: */{gendcr!'d', "DCR D", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x16: */{genmvi!'d', "MVI", "D,#$%!", 1},
@@ -301,7 +301,7 @@ immutable Opcode[] opcodes = [
 	/*0x20: */{&un_impl, "RIM"}, // "special".  Whatever the hell that means.
 	/*0x21: */{genlxi!"hl", "LXI", "H,#$%1%0", 2},
 	/*0x22: */{(State state, ubyte opcode, ubyte[] args) { ushort ptr = (args[1] << 8) | args[0]; state.mem.memory[ptr] = state.mem.l; state.mem.memory[ptr+1] = state.mem.h; return cast(ushort)0; }, "SHLD", "#$%1%0 = LH", 2},
-	/*0x23: */{geninx!"h", "INX H"},
+	/*0x23: */{geninx!"hl", "INX HL"},
 	/*0x24: */{geninr!'h', "INR H", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x25: */{gendcr!'h', "DCR H", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x26: */{genmvi!'h', "MVI", "H,#$%!", 1},

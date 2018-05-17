@@ -113,15 +113,15 @@ void run(State state, bool dbg = false) {
 
 	while (state.mem.pc < state.mem.memory.length /* 0x1fff */ /* || true */) {
 		if (dbg) {
-			bool valid_cmd;
 			string err_reason;
+			bool valid_cmd;
 
 			writefln("Execution: %s", disasemble_instr(state.mem, state.mem.pc));
 			with (state.mem) writefln("Registers: a: 0x%02x, b: 0x%02x, c: 0x%02x, d: 0x%02x, e: 0x%02x, h: 0x%02x, l: 0x%02x, bc: 0x%04x, de: 0x%04x, hl: 0x%04x, sp: 0x%04x, pc: 0x%04x.", a, b, c, d, e, h, l, bc, de, hl, sp, pc);
 			with (state.mem) writefln("Registers: a: %-4s, b: %-4s, c: %-4s, d: %-4s, e: %-4s, h: %-4s, l: %-4s, bc: %-6s, de: %-6s, hl: %-6s, sp: %-6s, pc: %-6s.", a, b, c, d, e, h, l, bc, de, hl, sp, pc); // todo: make this prettier ('a: 5,    b:' instead of 'a: 5   , :' (or possibly it should be 'a:   5,  b:' so that the 5 lines up with the '5' in '0x5' instead of the '0'?))
 			with (state.condition) writefln("Flags: %s%s%s%s%s.  %s", z ? "zero, " : "", s ? "sign, " : "", p ? "parity, " : "", cy ? "carry, " : "", ac ? "auxilliary carry" : "", state.interrupt_enabled ? "Interrupts enabled" : "Interrupts not enabled");
 
-			while (!valid_cmd) {
+			while (true) {
 				write("> ");
 				string[] args = readln.split;
 

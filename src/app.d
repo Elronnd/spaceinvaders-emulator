@@ -7,7 +7,7 @@ void main(string[] args) {
 	import std.file: read;
 
 	State s = new State();
-	s.mem.memory = new ubyte[0x3fff];
+	s.mem.memory = new ubyte[0x4000];
 	s.mem.memory[0x0000 .. 0x07ff + 1] = cast(ubyte[])read("roam/invaders.h");
 	s.mem.memory[0x0800 .. 0x0fff + 1] = cast(ubyte[])read("roam/invaders.g");
 	s.mem.memory[0x1000 .. 0x17ff + 1] = cast(ubyte[])read("roam/invaders.f");
