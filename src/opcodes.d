@@ -41,11 +41,11 @@ ushort SUI(State state, ubyte opcode, ubyte[] args) {
 Opfun genmov(char to, char from)() {
 	return (State state, ubyte opcode, ubyte[] args) {
 		static if (from == 'm') {
-			mixin("state.mem." ~ to ~ " = state.mem.memory[state.mem.hl];");
+			mixin(q{state.mem.} ~ to) = state.mem.memory[state.mem.hl];
 		} else static if (to == 'm') {
-			mixin("state.mem.memory[state.mem.hl] = state.mem." ~ from ~ ";");
+			state.mem.memory[state.mem.hl] = mixin(q{state.mem.} ~ from);
 		} else {
-			mixin("state.mem." ~ to ~ " = state.mem." ~ from ~ ";");
+			mixin(q{state.mem.} ~ to) = mixin(q{state.mem.} ~ from);
 		}
 		return cast(ushort)0;
 	};
@@ -55,9 +55,9 @@ Opfun genmov(char to, char from)() {
 Opfun genadd(char from)() {
 	return (State state, ubyte opcode, ubyte[] args) {
 		static if (from == 'm') {
-			mixin("ushort ans = cast(ushort)state.mem.a + cast(ushort)state.mem.memory[state.mem.hl];");
+			ushort ans = cast(ushort)state.mem.a + cast(ushort)state.mem.memory[state.mem.hl];
 		} else {
-			mixin("ushort ans = cast(ushort)state.mem.a + cast(ushort)state.mem." ~ from ~ ";");
+			ushort ans = cast(ushort)state.mem.a + cast(ushort)mixin(q{state.mem.} ~ from);
 		}
 
 		state.mem.a = ans&0xff;
@@ -67,9 +67,9 @@ Opfun genadd(char from)() {
 Opfun gensub(char from)() {
 	return (State state, ubyte opcode, ubyte[] args) {
 		static if (from == 'm') {
-			mixin("ushort ans = cast(ushort)(state.mem.a - cast(ushort)state.mem.memory[state.mem.hl]);");
+			ushort ans = cast(ushort)(state.mem.a - cast(ushort)state.mem.memory[state.mem.hl]);
 		} else {
-			mixin("ushort ans = cast(ushort)(state.mem.a - cast(ushort)state.mem." ~ from ~ ");");
+			ushort ans = cast(ushort)(state.mem.a - cast(ushort)mixin(q{state.mem.} ~ from);
 		}
 
 		state.mem.a = ans&0xff;
@@ -79,9 +79,9 @@ Opfun gensub(char from)() {
 Opfun gensbb(char from)() {
 	return (State state, ubyte opcode, ubyte[] args) {
 		static if (from == 'm') {
-			mixin("ushort ans = cast(ushort)(state.mem.a - cast(ushort)state.mem.memory[state.mem.hl] - state.condition.cy);");
+			ushort ans = cast(ushort)(state.mem.a - cast(ushort)state.mem.memory[state.mem.hl] - state.condition.cy);
 		} else {
-			mixin("ushort ans = cast(ushort)(state.mem.a - cast(ushort)state.mem." ~ from ~ " - state.condition.cy);");
+			ushort ans = cast(ushort)(state.mem.a - cast(ushort)mixin(q{state.mem.} ~ from) - state.condition.cy);
 		}
 
 		state.mem.a = ans&0xff;
@@ -93,7 +93,7 @@ Opfun geninr(char from)() {
 		static if (from == 'm') {
 			return ++state.mem.memory[state.mem.hl];
 		} else {
-			return ++mixin("state.mem." ~ from);
+			return ++mixin(q{state.mem.} ~ from);
 		}
 	};
 }
@@ -102,7 +102,7 @@ Opfun gendcr(char from)() {
 		static if (from == 'm') {
 			return --state.mem.memory[state.mem.hl];
 		} else {
-			return --mixin("state.mem." ~ from);
+			return --mixin(q{state.mem.} ~ from);
 		}
 	};
 }
@@ -111,7 +111,7 @@ Opfun genadc(char from)() {
 		static if (from == 'm') {
 			ushort ans = cast(ushort)(state.mem.a + cast(ushort)state.mem.memory[state.mem.hl] + state.condition.cy);
 		} else {
-			mixin(q{ushort ans = cast(ushort)(state.mem.a + cast(ushort)state.mem.} ~ from ~ q{+ state.condition.cy);});
+			ushort ans = cast(ushort)(state.mem.a + cast(ushort)mixin(q{state.mem.} ~ from) + state.condition.cy);
 		}
 
 		state.mem.a = ans&0xff;
@@ -120,14 +120,14 @@ Opfun genadc(char from)() {
 }
 Opfun geninx(string from /* could be sp */)() {
 	return (State state, ubyte opcode, ubyte[] args) {
-		mixin("state.mem." ~ from ~ "++;");
+		mixin(q{state.mem.} ~ from)++;
 
 		return cast(ushort)0;
 	};
 }
 Opfun gendcx(string from /* could be sp */)() {
 	return (State state, ubyte opcode, ubyte[] args) {
-		mixin("state.mem." ~ from ~ "--;");
+		mixin(q{state.mem.} ~ from)--;
 
 		return cast(ushort)0;
 	};

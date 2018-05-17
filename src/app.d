@@ -14,5 +14,5 @@ void main(string[] args) {
 	s.mem.memory[0x1800 .. 0x1fff + 1] = cast(ubyte[])read("roam/invaders.e");
 
 	//print_dissasembly(s.mem);
-	run(s, true);
+	run(s, false);
 }
