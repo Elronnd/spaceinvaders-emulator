@@ -230,10 +230,10 @@ Opfun gencret(string from, bool expected)() {
 	};
 }
 void push(State state, ubyte value) {
-	state.mem.memory[--state.mem.pc] = value;
+	state.mem.memory[--state.mem.sp] = value;
 }
 ubyte pop(State state) {
-	return state.mem.memory[state.mem.pc++];
+	return state.mem.memory[state.mem.sp++];
 }
 void call(State state, ushort addr) {
 	state.push(addr >> 8);
