@@ -265,7 +265,7 @@ Opfun gencmp(char target)() {
 
 
 // custom formatter.  Just accepts '%!' by itself (or %% to escape)
-Opcode[] opcodes = [
+immutable Opcode[] opcodes = [
 	/*0x00: */{&nop, "NOP"},
 	/*0x01: */{genlxi!"bc", "LXI", "B,#$%1%0", 2},
 	/*0x02: */{genstax!"bc", "STAX B"},

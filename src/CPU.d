@@ -1,8 +1,8 @@
 static import opcodes;
 import std.stdio;
+import std.string: format;
 
-string cformat(in string str, ubyte[] args) {
-	import std.string: format;
+pure string cformat(in string str, ubyte[] args) {
 
 	size_t argindex;
 	string ret;
@@ -125,10 +125,11 @@ void run(State state) {
 }
 
 
-void disasemble_instr(Mem mem, ushort pc) {
+pure string disasemble_instr(Mem mem, ushort pc) {
 	opcodes.Opcode op;
+	string ret;
 	//writefln("Disassembling at memory location %s which is %s", pc, mem.memory[pc]);
-	writef("%04x: ", pc);
+	ret ~= format("%04x: ", pc);
 
 	op = opcodes.opcodes[mem.memory[pc]];
 
@@ -141,17 +142,19 @@ void disasemble_instr(Mem mem, ushort pc) {
 		foreach (i; 0 .. op.size) {
 			hex ~= format(" %02x", mem.memory[pc+i]);
 		}
-		writef("%-8s", hex); // max 8 characters (6 hex, plus 2 spaces, plus some padding
+		ret ~= format("%-8s", hex); // max 8 characters (6 hex, plus 2 spaces, plus some padding
 		// - left-aligns
 	}
 
-	write("\t\t"); // padding
+	ret ~= "\t\t"; // padding
 
 
 	// write dissassembly
-	write(op.opcode);
-	write("\t");
-	write(cformat(op.format_string, mem.memory[pc .. pc+op.size]));
+	ret ~= op.opcode;
+	ret ~= '\t';
+	ret ~= cformat(op.format_string, mem.memory[pc .. pc+op.size]);
+
+	return ret;
 }
 
 
@@ -161,9 +164,7 @@ void print_dissasembly(Mem mem) {
 
 	while (pc < mem.memory.length /* 0x1fff */) {
 		//writefln("Pc: %s", pc);
-		disasemble_instr(mem, pc);
-
-		writeln;
+		writeln(disasemble_instr(mem, pc));
 
 		// skip over arguments and instruction
 		//writefln("Adding %s to pc from %s", opcodes.opcodes[mem.memory[pc]].size + 1, opcodes.opcodes[mem.memory[pc]]);
