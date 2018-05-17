@@ -2,8 +2,8 @@ import CPU;
 import SDL;
 import std.stdio;
 
-enum width = 256;
-enum height = 224;
+enum width = 224;
+enum height = 256;
 enum start = 0x2400;
 enum end = 0x3fff;
 
@@ -16,20 +16,20 @@ enum end = 0x3fff;
  */
 
 void draw_screen(ubyte[] mem) {
-	uint x, y = height;
+	uint x, y = height - 1;
 
 	foreach (i; start .. end+1) {
 		foreach (bit; 0 .. 8) {
 			if (mem[i] & (1 << bit)) {
-				SDL2.drawpx(0xffffffff, y, x);
+				SDL2.drawpx(0xffffff, y, x);
 			} else {
 				SDL2.drawpx(0x0, y, x);
 			}
-			if (x == 256) {
+			if (x == width) {
 				assert(0);
 			}
 			if (y == 0) {
-				y = height;
+				y = height - 1;
 				x++;
 			} else {
 				y--;

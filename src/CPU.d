@@ -146,7 +146,7 @@ void debug_instr(State state) {
 }
 
 
-void step(State state) {
+ubyte step(State state) {
 	opcodes.Opcode curr;
 	ubyte opcode;
 	ubyte[] opargs;
@@ -159,6 +159,7 @@ void step(State state) {
 	ans = curr.fun(state, opcode, opargs);
 
 	set_conditions(state, ans, curr.cccodes_set);
+	return curr.cycles;
 }
 
 private pure string disasemble_instr(Mem mem, ushort pc) {
