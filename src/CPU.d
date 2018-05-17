@@ -5,7 +5,7 @@ import std.stdio;
 import std.string: format;
 import std.array: split;
 
-pure string cformat(in string str, ubyte[] args) {
+pure /*private*/ string cformat(in string str, ubyte[] args) {
 	size_t argindex;
 	string ret;
 
@@ -88,7 +88,7 @@ class State {
 }
 
 
-void set_conditions(State state, ushort ans, Conditions conditions) {
+private void set_conditions(State state, ushort ans, Conditions conditions) {
 	if (conditions & Conditions.z) {
 		state.condition.z = ((ans & 0xff) == 0);
 	}
@@ -104,66 +104,64 @@ void set_conditions(State state, ushort ans, Conditions conditions) {
 //	state.condition.ac = (ans & 0xff) != 0;
 }
 
-void run(State state, bool dbg = false) {
-	state.mem.pc = 0;
+void debug_instr(State state) {
+	string err_reason;
+	bool valid_cmd;
+
+	writefln("Execution: %s", disasemble_instr(state.mem, state.mem.pc));
+	with (state.mem) writefln("Registers: a: 0x%02x, b: 0x%02x, c: 0x%02x, d: 0x%02x, e: 0x%02x, h: 0x%02x, l: 0x%02x, bc: 0x%04x, de: 0x%04x, hl: 0x%04x, sp: 0x%04x, pc: 0x%04x.", a, b, c, d, e, h, l, bc, de, hl, sp, pc);
+	with (state.mem) writefln("Registers: a: %-4s, b: %-4s, c: %-4s, d: %-4s, e: %-4s, h: %-4s, l: %-4s, bc: %-6s, de: %-6s, hl: %-6s, sp: %-6s, pc: %-6s.", a, b, c, d, e, h, l, bc, de, hl, sp, pc); // todo: make this prettier ('a: 5,    b:' instead of 'a: 5   , :' (or possibly it should be 'a:   5,  b:' so that the 5 lines up with the '5' in '0x5' instead of the '0'?))
+	with (state.condition) writefln("Flags: %s%s%s%s%s.  %s", z ? "zero, " : "", s ? "sign, " : "", p ? "parity, " : "", cy ? "carry, " : "", ac ? "auxilliary carry" : "", state.interrupt_enabled ? "Interrupts enabled" : "Interrupts not enabled");
+
+	while (true) {
+		write("> ");
+		string[] args = readln.split;
+
+		if (!args) {
+			break;
+		}
+
+		string cmd = args[0];
+		args = args[1 .. $];
+
+		if (cmd !in dbg_cmds) {
+			valid_cmd = false;
+			err_reason = format("%s is not a command!", cmd);
+			// -1 = any number of arguments
+		} else if ((cast(byte)(args.length) !in dbg_cmds[cmd].argnums) && (-1 !in dbg_cmds[cmd].argnums)) {
+			valid_cmd = false;
+			err_reason = format("passed %s arguments to a function that could only take %s arguments", args.length, dbg_cmds[cmd].argnums);
+		} else if (!dbg_cmds[cmd].veriflags(args, err_reason)) {
+			valid_cmd = false;
+		} else {
+			valid_cmd = true;
+		}
+
+		if (valid_cmd) {
+			dbg_cmds[cmd].cmd(state, args);
+		} else {
+			writefln("Error: %s.  Press <enter> to skip to the next instruction.", err_reason);
+		}
+	}
+}
+
+
+void step(State state) {
 	opcodes.Opcode curr;
 	ubyte opcode;
 	ubyte[] opargs;
 	ushort ans;
 
-	while (state.mem.pc < state.mem.memory.length /* 0x1fff */ /* || true */) {
-		if (dbg) {
-			string err_reason;
-			bool valid_cmd;
+	opcode = state.mem.memory[state.mem.pc++];
+	curr = opcodes.opcodes[opcode];
+	opargs = state.mem.memory[state.mem.pc .. state.mem.pc+=curr.size];
 
-			writefln("Execution: %s", disasemble_instr(state.mem, state.mem.pc));
-			with (state.mem) writefln("Registers: a: 0x%02x, b: 0x%02x, c: 0x%02x, d: 0x%02x, e: 0x%02x, h: 0x%02x, l: 0x%02x, bc: 0x%04x, de: 0x%04x, hl: 0x%04x, sp: 0x%04x, pc: 0x%04x.", a, b, c, d, e, h, l, bc, de, hl, sp, pc);
-			with (state.mem) writefln("Registers: a: %-4s, b: %-4s, c: %-4s, d: %-4s, e: %-4s, h: %-4s, l: %-4s, bc: %-6s, de: %-6s, hl: %-6s, sp: %-6s, pc: %-6s.", a, b, c, d, e, h, l, bc, de, hl, sp, pc); // todo: make this prettier ('a: 5,    b:' instead of 'a: 5   , :' (or possibly it should be 'a:   5,  b:' so that the 5 lines up with the '5' in '0x5' instead of the '0'?))
-			with (state.condition) writefln("Flags: %s%s%s%s%s.  %s", z ? "zero, " : "", s ? "sign, " : "", p ? "parity, " : "", cy ? "carry, " : "", ac ? "auxilliary carry" : "", state.interrupt_enabled ? "Interrupts enabled" : "Interrupts not enabled");
+	ans = curr.fun(state, opcode, opargs);
 
-			while (true) {
-				write("> ");
-				string[] args = readln.split;
-
-				if (!args) {
-					break;
-				}
-
-				string cmd = args[0];
-				args = args[1 .. $];
-
-				if (cmd !in dbg_cmds) {
-					valid_cmd = false;
-					err_reason = format("%s is not a command!", cmd);
-				// -1 = any number of arguments
-				} else if ((cast(byte)(args.length) !in dbg_cmds[cmd].argnums) && (-1 !in dbg_cmds[cmd].argnums)) {
-					valid_cmd = false;
-					err_reason = format("passed %s arguments to a function that could only take %s arguments", args.length, dbg_cmds[cmd].argnums);
-				} else if (!dbg_cmds[cmd].veriflags(args, err_reason)) {
-					valid_cmd = false;
-				} else {
-					valid_cmd = true;
-				}
-
-				if (valid_cmd) {
-					dbg_cmds[cmd].cmd(state, args);
-				} else {
-					writefln("Error: %s.  Press <enter> to skip to the next instruction.", err_reason);
-				}
-			}
-		}
-		opcode = state.mem.memory[state.mem.pc++];
-		curr = opcodes.opcodes[opcode];
-		opargs = state.mem.memory[state.mem.pc .. state.mem.pc+=curr.size];
-
-		ans = curr.fun(state, opcode, opargs);
-
-		set_conditions(state, ans, curr.cccodes_set);
-	}
+	set_conditions(state, ans, curr.cccodes_set);
 }
 
-
-pure string disasemble_instr(Mem mem, ushort pc) {
+private pure string disasemble_instr(Mem mem, ushort pc) {
 	opcodes.Opcode op;
 	string ret;
 	ret ~= format("%04x: ", pc);
