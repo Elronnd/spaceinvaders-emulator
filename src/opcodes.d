@@ -69,7 +69,7 @@ Opfun gensub(char from)() {
 		static if (from == 'm') {
 			ushort ans = cast(ushort)(state.mem.a - cast(ushort)state.mem.memory[state.mem.hl]);
 		} else {
-			ushort ans = cast(ushort)(state.mem.a - cast(ushort)mixin(q{state.mem.} ~ from);
+			ushort ans = cast(ushort)(state.mem.a - cast(ushort)mixin(q{state.mem.} ~ from));
 		}
 
 		state.mem.a = ans&0xff;
