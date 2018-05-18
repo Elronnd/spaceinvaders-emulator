@@ -36,9 +36,6 @@ void main(string[] args) {
 				s.interrupted = true;
 			}
 
-			auto sw2 = StopWatch();
-			uint time_elapsed = 0;
-			sw2.start();
 			SDL_Event *ev;
 			while ((ev = SDL2.poll_event()) !is null) {
 				if ((ev.type != SDL_KEYDOWN) && (ev.type != SDL_KEYUP)) {
@@ -50,6 +47,9 @@ void main(string[] args) {
 						break;
 					case SDLK_RIGHT:
 						p1_right = ev.type == SDL_KEYDOWN;
+						break;
+					case SDLK_UP:
+						p2_tilt = ev.type == SDL_KEYDOWN;
 						break;
 					case SDLK_SPACE:
 						p1_shoot = ev.type == SDL_KEYDOWN;
@@ -72,9 +72,7 @@ void main(string[] args) {
 				s.interrupt = [0xd7]; // RST 2
 				s.interrupted = true;
 			}
-			time_elapsed = cast(uint)sw2.peek().nsecs;
-			Thread.sleep(dur!"nsecs"(ns_per_screenrefresh - time_elapsed));
-			sw2.reset();
+			//writeln("Frame");
 		}
 	}).start();
 	sw.start();

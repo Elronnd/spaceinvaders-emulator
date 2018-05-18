@@ -21,8 +21,13 @@ public:
 		if (!window) {
 			return false;
 		}
+		SDL_DisplayMode mode;
+		mode.refresh_rate = 60;
+		if (SDL_SetWindowDisplayMode(window, &mode) < 0) {
+			return false;
+		}
 
-		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 		if (!renderer) {
 			return false;
 		}
@@ -59,6 +64,9 @@ public:
 	SDL_Event *poll_event() {
 		SDL_Event *ret = new SDL_Event;
 		if (SDL_PollEvent(ret)) {
+			if ((ret.type == SDL_KEYDOWN) && (ret.key.repeat)) {
+				return null;
+			}
 			return ret;
 		} else {
 			return null;

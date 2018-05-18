@@ -158,6 +158,7 @@ void debug_instr(State state) {
 
 
 ubyte step(State state) {
+	//writeln(disasemble_instr(state.mem, state.mem.pc));
 	opcodes.Opcode curr;
 	ubyte opcode;
 	ubyte[] opargs;
