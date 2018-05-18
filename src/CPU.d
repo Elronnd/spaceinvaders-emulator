@@ -85,6 +85,16 @@ class State {
 	Mem mem;
 	Condition condition;
 	bool interrupt_enabled;
+	ushort interrupt_loc;
+
+	this() {
+		mem.memory = new ubyte[0x10000];
+		mem.sp = 0xF000;
+	}
+}
+
+void push(State state, ubyte value) {
+	state.mem.memory[--state.mem.sp] = value;
 }
 
 

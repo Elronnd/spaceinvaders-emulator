@@ -19,7 +19,6 @@ void main(string[] args) {
 	__gshared bool done;
 	__gshared State s = new State();
 
-	s.mem.memory = new ubyte[0x4000];
 	s.mem.memory[0x0000 .. 0x07ff + 1] = cast(ubyte[])read("roam/invaders.h");
 	s.mem.memory[0x0800 .. 0x0fff + 1] = cast(ubyte[])read("roam/invaders.g");
 	s.mem.memory[0x1000 .. 0x17ff + 1] = cast(ubyte[])read("roam/invaders.f");
@@ -32,6 +31,10 @@ void main(string[] args) {
 			assert(0);
 		}
 		while (true) {
+			if (s.interrupt_enabled) {
+				s.interrupt_loc = 8;
+			}
+
 			auto sw2 = StopWatch();
 			uint time_elapsed = 0;
 			sw2.start();
@@ -64,6 +67,9 @@ void main(string[] args) {
 
 			draw_screen(s.mem.memory);
 			SDL2.refresh;
+			if (s.interrupt_enabled) {
+				s.interrupt_loc = 16;
+			}
 			time_elapsed = cast(uint)sw2.peek().nsecs;
 			Thread.sleep(dur!"nsecs"(ns_per_screenrefresh - time_elapsed));
 			sw2.reset();
@@ -72,6 +78,13 @@ void main(string[] args) {
 	sw.start();
 	//print_dissasembly(s.mem);
 	while (!done) {
+		if (s.interrupt_enabled) {
+			s.interrupt_enabled = false;
+			s.push(s.mem.pc >> 8);
+			s.push(s.mem.pc & 0xff);
+			s.mem.pc = s.interrupt_loc;
+		}
+
 		static if (dbg) {
 			debug_instr(s);
 		}

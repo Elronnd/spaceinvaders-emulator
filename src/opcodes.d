@@ -230,9 +230,6 @@ Opfun gencret(string from, bool expected)() {
 		return cast(ushort)0;
 	};
 }
-void push(State state, ubyte value) {
-	state.mem.memory[--state.mem.sp] = value;
-}
 ubyte pop(State state) {
 	return state.mem.memory[state.mem.sp++];
 }
@@ -309,7 +306,7 @@ immutable Opcode[] opcodes = [
 	/*0x27: */{4, &un_impl, "DAA", "special"},
 	/*0x28: */{4, &nop, "NOP"},
 	/*0x29: */{10, gendad!"hl", "DAD H", cccodes_set:Conditions.cy},
-	/*0x2a: */{16, (State state, ubyte opcode, ubyte[] args) { ushort ptr = (args[1] << 8) | args[0]; state.mem.l = state.mem.memory[ptr]; state.mem.h = state.mem.memory[ptr+1]; return cast(ushort)0; }, "LHLD", "LH = #$%1%0"},
+	/*0x2a: */{16, (State state, ubyte opcode, ubyte[] args) { ushort ptr = (args[1] << 8) | args[0]; state.mem.l = state.mem.memory[ptr]; state.mem.h = state.mem.memory[ptr+1]; return cast(ushort)0; }, "LHLD", "LH = #$%1%0", 2},
 	/*0x2b: */{5, gendcx!"hl", "DCX HL"},
 	/*0x2c: */{5, geninr!'l', "INR L", cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0x2d: */{5, gendcr!'l', "DCR L", cccodes_set:Conditions.all & ~(Conditions.cy)},
