@@ -32,7 +32,7 @@ void main(string[] args) {
 		}
 		while (true) {
 			if (s.interrupt_enabled) {
-				s.interrupt_loc = 8;
+				s.interrupt = [0xcf]; // RST 1
 				s.interrupted = true;
 			}
 
@@ -69,7 +69,7 @@ void main(string[] args) {
 			draw_screen(s.mem.memory);
 			SDL2.refresh;
 			if (s.interrupt_enabled) {
-				s.interrupt_loc = 16;
+				s.interrupt = [0xd7]; // RST 2
 				s.interrupted = true;
 			}
 			time_elapsed = cast(uint)sw2.peek().nsecs;
@@ -82,9 +82,7 @@ void main(string[] args) {
 	while (!done) {
 		if (s.interrupt_enabled && s.interrupted) {
 			s.interrupted = false;
-			s.push(s.mem.pc >> 8);
-			s.push(s.mem.pc & 0xff);
-			s.mem.pc = s.interrupt_loc;
+			interrupt(s, s.interrupt);
 		}
 
 		static if (dbg) {

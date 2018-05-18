@@ -86,7 +86,7 @@ class State {
 	Condition condition;
 	bool interrupt_enabled;
 	bool interrupted;
-	ushort interrupt_loc;
+	ubyte[] interrupt;
 
 	this() {
 		mem.memory = new ubyte[0x10000];
@@ -171,6 +171,16 @@ ubyte step(State state) {
 
 	set_conditions(state, ans, curr.cccodes_set);
 	return curr.cycles;
+}
+
+ubyte interrupt(State state, ubyte[] codes) {
+	opcodes.Opcode curr = opcodes.opcodes[codes[0]];
+	if ((codes.length - 1) != curr.size) {
+		assert(0);
+	}
+
+	set_conditions(state, curr.fun(state, codes[0], codes[1 .. $]), curr.cccodes_set);
+	return opcodes.opcodes[codes[0]].cycles;
 }
 
 private pure string disasemble_instr(Mem mem, ushort pc) {
