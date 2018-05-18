@@ -4,7 +4,7 @@ import SDL;
 import derelict.sdl2.sdl;                                                                                                              
 
 
-bool p1_start, p1_shoot, p1_left, p1_right;
+__gshared bool p1_start, p1_shoot, p1_left, p1_right;
 
 
 ushort shift;

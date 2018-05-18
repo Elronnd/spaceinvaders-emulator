@@ -10,34 +10,31 @@ import core.thread: Thread;
 import std.datetime: StopWatch;
 
 enum dbg = 0;
-enum us_per_cycle = 2;
-enum us_per_screenrefresh = 16666;
+enum ns_per_cycle = 500;
+enum ns_per_screenrefresh = 16666666;
 
 
 void main(string[] args) {
 	auto sw = StopWatch();
-	uint time_since_refresh;
+	__gshared bool done;
+	__gshared State s = new State();
 
-	State s = new State();
 	s.mem.memory = new ubyte[0x4000];
 	s.mem.memory[0x0000 .. 0x07ff + 1] = cast(ubyte[])read("roam/invaders.h");
 	s.mem.memory[0x0800 .. 0x0fff + 1] = cast(ubyte[])read("roam/invaders.g");
 	s.mem.memory[0x1000 .. 0x17ff + 1] = cast(ubyte[])read("roam/invaders.f");
 	s.mem.memory[0x1800 .. 0x1fff + 1] = cast(ubyte[])read("roam/invaders.e");
-	if (!SDL2.init("Space Invaders!")) {
-		writefln("SDL error: %s", SDL2.err_msg());
-		assert(0);
-	}
 
 
-	sw.start();
-	//print_dissasembly(s.mem);
-	while (true) {
-		static if (dbg) {
-			debug_instr(s);
+	new Thread({
+		if (!SDL2.init("Space Invaders!")) {
+			writefln("SDL error: %s", SDL2.err_msg());
+			assert(0);
 		}
-		if (time_since_refresh >= us_per_screenrefresh) {
-			// munch events
+		while (true) {
+			auto sw2 = StopWatch();
+			uint time_elapsed = 0;
+			sw2.start();
 			SDL_Event *ev;
 			while ((ev = SDL2.poll_event()) !is null) {
 				if ((ev.type != SDL_KEYDOWN) && (ev.type != SDL_KEYUP)) {
@@ -57,24 +54,35 @@ void main(string[] args) {
 						p1_start = ev.type == SDL_KEYDOWN;
 						break;
 					case SDLK_q:
+						writeln("QUIT");
 						SDL2.close;
-						goto quit;
-					default: break;
+						done = true;
+						return;
+				default: break;
 				}
 			}
 
-			time_since_refresh -= us_per_screenrefresh;
 			draw_screen(s.mem.memory);
 			SDL2.refresh;
+			time_elapsed = cast(uint)sw2.peek().nsecs;
+			Thread.sleep(dur!"nsecs"(ns_per_screenrefresh - time_elapsed));
+			sw2.reset();
 		}
-		int time_theoretical = step(s) * us_per_cycle;
-		int elapsed = cast(int)sw.peek().usecs;
-		time_since_refresh += time_theoretical;
+	}).start();
+	sw.start();
+	//print_dissasembly(s.mem);
+	while (!done) {
+		static if (dbg) {
+			debug_instr(s);
+		}
+
+		int time_theoretical = step(s) * ns_per_cycle;
+		int elapsed = cast(int)sw.peek().nsecs;
 		int t = time_theoretical - elapsed;
 		if (t < 0) {
 			writeln("LAG OF ", t);
 		} else {
-			Thread.sleep(dur!"usecs"(t));
+			Thread.sleep(dur!"nsecs"(t));
 		}
 		sw.reset();
 	}
