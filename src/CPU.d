@@ -85,6 +85,7 @@ class State {
 	Mem mem;
 	Condition condition;
 	bool interrupt_enabled;
+	bool interrupted;
 	ushort interrupt_loc;
 
 	this() {

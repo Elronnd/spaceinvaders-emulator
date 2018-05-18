@@ -33,6 +33,7 @@ void main(string[] args) {
 		while (true) {
 			if (s.interrupt_enabled) {
 				s.interrupt_loc = 8;
+				s.interrupted = true;
 			}
 
 			auto sw2 = StopWatch();
@@ -69,6 +70,7 @@ void main(string[] args) {
 			SDL2.refresh;
 			if (s.interrupt_enabled) {
 				s.interrupt_loc = 16;
+				s.interrupted = true;
 			}
 			time_elapsed = cast(uint)sw2.peek().nsecs;
 			Thread.sleep(dur!"nsecs"(ns_per_screenrefresh - time_elapsed));
@@ -78,8 +80,8 @@ void main(string[] args) {
 	sw.start();
 	//print_dissasembly(s.mem);
 	while (!done) {
-		if (s.interrupt_enabled) {
-			s.interrupt_enabled = false;
+		if (s.interrupt_enabled && s.interrupted) {
+			s.interrupted = false;
 			s.push(s.mem.pc >> 8);
 			s.push(s.mem.pc & 0xff);
 			s.mem.pc = s.interrupt_loc;
