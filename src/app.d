@@ -7,7 +7,7 @@ import io;
 import std.file: read;
 import core.time: dur;
 import core.thread: Thread;
-import std.datetime: StopWatch;
+import std.datetime.stopwatch: StopWatch;
 
 enum dbg = 0;
 enum ns_per_cycle = 500;
@@ -88,7 +88,7 @@ void main(string[] args) {
 		}
 
 		int time_theoretical = step(s) * ns_per_cycle;
-		int elapsed = cast(int)sw.peek().nsecs;
+		int elapsed = cast(int)sw.peek().total!"nsecs";
 		int t = time_theoretical - elapsed;
 		if (t < 0) {
 			writeln("LAG OF ", t);

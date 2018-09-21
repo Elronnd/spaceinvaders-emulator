@@ -6,7 +6,7 @@
 	"dependencies": {
 		"derelict-sdl2": "~>2.1.4"
 	},
-	"description": "A minimal D application.",
-	"copyright": "Copyright © 2017, elronnd",
-	"license": "proprietary"
+	"description": "Space invaders emulator written in d",
+	"copyright": "Copyright © 2017-2018, elronnd",
+	"license": "MIT"
 }

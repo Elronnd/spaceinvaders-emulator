@@ -1,0 +1,1 @@
+This is an intel 8080 emulator, currently set up to emulate a space invaders machine.  It is based off of the tutorial at http://emulator101.com/.  At the moment, there's a timing problem, a speed problem, an input problem, and a problem where if you quit it with ^C, it doesn't quit.  However, it does show the title screen properly.  All these will be fixed at some point.
