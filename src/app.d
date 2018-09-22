@@ -1,4 +1,5 @@
 import std.stdio;
+static import opcodes;
 import derelict.sdl2.image, derelict.sdl2.sdl, derelict.sdl2.ttf, derelict.sdl2.mixer;
 import drawing;
 import CPU;
@@ -9,13 +10,26 @@ import core.time: dur;
 import core.thread: Thread;
 import std.datetime.stopwatch: StopWatch;
 
-enum dbg = 0;
+enum dbg = 1;
 enum ns_per_cycle = 500;
-enum ns_per_screenrefresh = 16666666;
+enum ns_per_frame = 16666666;
+import core.stdc.time: time_t;
+// d doesn't support c11
+extern (C) struct timespec {
+	time_t tv_sec;
+	long tv_nsec;
+}
+
+
+extern (C) int timespec_get(timespec *ts, int base);
+ulong time_mod_n(ulong n) {
+	timespec t;
+	timespec_get(&t, 1); // 1 is a reasonable guess for UTC
+	return (t.tv_nsec + ((t.tv_sec % n) * (1_000_000 % n)) % n) % n;
+}
 
 
 void main(string[] args) {
-	auto sw = StopWatch();
 	__gshared bool done;
 	__gshared State s = new State();
 
@@ -31,11 +45,6 @@ void main(string[] args) {
 			assert(0);
 		}
 		while (true) {
-			if (s.interrupt_enabled) {
-				s.interrupt = [0xcf]; // RST 1
-				s.interrupted = true;
-			}
-
 			SDL_Event *ev;
 			while ((ev = SDL2.poll_event()) !is null) {
 				if ((ev.type != SDL_KEYDOWN) && (ev.type != SDL_KEYUP)) {
@@ -55,7 +64,9 @@ void main(string[] args) {
 						p1_shoot = ev.type == SDL_KEYDOWN;
 						break;
 					case SDLK_RETURN:
+						writef("p1_start: %s", p1_start);
 						p1_start = ev.type == SDL_KEYDOWN;
+						writefln(" -> %s", p1_start);
 						break;
 					case SDLK_q:
 						writeln("QUIT");
@@ -68,34 +79,54 @@ void main(string[] args) {
 
 			draw_screen(s.mem.memory);
 			SDL2.refresh;
-			if (s.interrupt_enabled) {
-				s.interrupt = [0xd7]; // RST 2
-				s.interrupted = true;
-			}
-			//writeln("Frame");
+
 		}
 	}).start();
-	sw.start();
 	//print_dissasembly(s.mem);
+
 	while (!done) {
-		if (s.interrupt_enabled && s.interrupted) {
-			s.interrupted = false;
-			interrupt(s, s.interrupt);
+		if (s.interrupt_enabled) {
+			s.interrupt = [0xcf]; // RST 1
+			s.interrupted = true;
 		}
 
-		static if (dbg) {
-			debug_instr(s);
+		// intentionally unsigned.  It is allowed to go negative.  So, if we get to 16_666_664ns in this frame, then we want to execute 16_666_668ns worth of stuff next frame.  it Just Works™
+		long ns_this_frame;
+		while (true) {
+			if (s.interrupt_enabled && s.interrupted) {
+				s.interrupted = false;
+				interrupt(s, s.interrupt);
+			}
+
+			static if (dbg) {
+				debug_instr(s);
+			}
+
+			// fetch the op
+			ubyte op_b = s.mem.memory[s.mem.pc];
+			opcodes.Opcode op = opcodes.opcodes[op_b];
+			ns_this_frame += op.cycles * ns_per_cycle;
+
+			// if it would push us over the the limit for one frame, then sleep now and defer it until the next frame
+			if (ns_this_frame > ns_per_frame) {
+				ns_this_frame -= ns_per_frame;
+				break;
+			}
+
+			// now actually execute it
+			s.mem.pc++;
+			ushort ans = op.fun(s, op_b, s.mem.memory[s.mem.pc .. s.mem.pc += op.size]);
+			set_conditions(s, ans, op.cccodes_set);
+		}
+		ulong sleep_time = ns_per_frame - time_mod_n(ns_per_frame);
+		//writefln("Sleeping for %s", sleep_time);
+		if (s.interrupt_enabled) {
+			s.interrupt = [0xd7]; // RST 2
+			s.interrupted = true;
 		}
 
-		int time_theoretical = step(s) * ns_per_cycle;
-		int elapsed = cast(int)sw.peek().total!"nsecs";
-		int t = time_theoretical - elapsed;
-		if (t < 0) {
-			writeln("LAG OF ", t);
-		} else {
-			Thread.sleep(dur!"nsecs"(t));
-		}
-		sw.reset();
+		Thread.sleep(dur!"nsecs"(sleep_time));
+
 	}
 
 quit:

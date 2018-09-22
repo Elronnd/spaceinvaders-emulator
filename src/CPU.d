@@ -99,7 +99,7 @@ void push(State state, ubyte value) {
 }
 
 
-private void set_conditions(State state, ushort ans, Conditions conditions) {
+void set_conditions(State state, ushort ans, Conditions conditions) {
 	if (conditions & Conditions.z) {
 		state.condition.z = ((ans & 0xff) == 0);
 	}
@@ -157,7 +157,8 @@ void debug_instr(State state) {
 }
 
 
-ubyte step(State state) {
+/*
+ubyte run(State state) {
 	//writeln(disasemble_instr(state.mem, state.mem.pc));
 	opcodes.Opcode curr;
 	ubyte opcode;
@@ -173,6 +174,7 @@ ubyte step(State state) {
 	set_conditions(state, ans, curr.cccodes_set);
 	return curr.cycles;
 }
+*/
 
 ubyte interrupt(State state, ubyte[] codes) {
 	opcodes.Opcode curr = opcodes.opcodes[codes[0]];

@@ -13,8 +13,11 @@ ubyte shift_offset;
 
 ubyte IN(State state, ubyte port) {
 	switch (port) {
+		case 0:
+			return 0 | (1 << 1) | (1 << 2) | (1 << 3) | (p1_shoot << 4) | (p1_left << 5) | (p1_right << 6);
 		case 1:
-			return 1 | (p1_start << 2) | (p1_shoot << 4) | (p1_left << 5) | (p1_right << 6);
+			writeln("Queried port 1");
+			return 1 | (p1_start << 2) | (1 << 3) | (p1_shoot << 4) | (p1_left << 5) | (p1_right << 6);
 		case 2:
 			return (p2_tilt << 2) | (p2_shoot << 4) | (p2_left << 5) | (p2_right << 6);
 		case 3:
