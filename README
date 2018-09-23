@@ -1,1 +1,8 @@
 This is an intel 8080 emulator, currently set up to emulate a space invaders machine.  It is based off of the tutorial at http://emulator101.com/.  At the moment, there's a timing problem, a speed problem, an input problem, and a problem where if you quit it with ^C, it doesn't quit.  However, it does show the title screen properly.  All these will be fixed at some point.
+
+You will need a space invaders rom to run the emulator.  These can be found across the internet.  They should be titled invaders.e through invaders.h, and be placed in the 'roam' directory.  For your convenience, the sha512 hashes of the roms I use are reproduced below:
+
+84ed0493357c3b6c0c5a49144fe92f29c6dbbd9a50ee1c41d393a3080020350d0f41b18b8f2b8c1242c41ce9279f3d37c77f7ed69c5dbde27dcac17c428ba136  roam/invaders.e
+a68e98f4c5b78fe0d879002e48370f932becc354b5819d679aae93d9d305b0ebef1b277ba96c6453091d5dcbb58bd6a7590e252dcbe15d82958c995c174918f7  roam/invaders.f
+f67919000b23213c72325feb1706ec915bc432d65b8db725e7dae1c2e1ffd0308e915fdc2b118b84b41d1a19959e26b2da15ae64c9b94ccd91018aceb4f06217  roam/invaders.g
+4ff45dedd27ee7ef5dd1f663a9179b1fdde31fc57e2eb18a07fac338c62cc2967d8687f74a6613a32e922323c3a69486276b7f5b9b9797ab5cbcee6ee8743a61  roam/invaders.h

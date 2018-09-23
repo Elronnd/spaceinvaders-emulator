@@ -18,3 +18,10 @@ emu101
 .*.swn
 .*.swm
 .*.swl
+
+
+# Copyright turds
+roam/invaders.e
+roam/invaders.f
+roam/invaders.g
+roam/invaders.h
