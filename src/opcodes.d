@@ -297,7 +297,7 @@ immutable Opcode[] opcodes = [
 	/*0x1e: */{7, genmvi!'e', "MVI", "E,#$%!", 1},
 	/*0x1f: */{4, (State state, ubyte opcode, ubyte[] args) { /* This one is even weirder.  Basically treat the bottom 7 bits of a and the carry bit all together as a byte, and right shift????????? */ ubyte bit7 = state.mem.a & 0b10000000; bool bit0 = state.mem.a & 0b00000001; state.mem.a = (state.mem.a >> 1) | bit7; state.condition.cy = bit0; return cast(ushort)0; }, "RAR"},
 	/*0x20: */{4, &un_impl, "RIM"}, // "special".  Whatever the hell that means.
-	/*0x21: */{10, genlxi!"hl", "LXI", "H,#$%1%0", 2},
+	/*0x21: */{10, genlxi!"hl", "LXI", "HL,#$%1%0", 2},
 	/*0x22: */{16, (State state, ubyte opcode, ubyte[] args) { ushort ptr = (args[1] << 8) | args[0]; state.mem.memory[ptr] = state.mem.l; state.mem.memory[ptr+1] = state.mem.h; return cast(ushort)0; }, "SHLD", "#$%1%0 = LH", 2},
 	/*0x23: */{5, geninx!"hl", "INX HL"},
 	/*0x24: */{5, geninr!'h', "INR H", cccodes_set:Conditions.all & ~(Conditions.cy)},
@@ -469,7 +469,29 @@ immutable Opcode[] opcodes = [
 	/*0xca: */{10, gencjmp!("z", true), "JZ", "$%1%0", 2},
 	/*0xcb: */{10, &nop, "NOP"},
 	/*0xcc: */{10, genccall!("z", true), "CZ", "$%1%0", 2},
-	/*0xcd: */{17, (State state, ubyte opcode, ubyte[] args) { state.call((args[1] << 8) | args[0]); return cast(ushort)0; }, "CALL", "$%1%0", 2},
+	/*0xcd: */{17, (State state, ubyte opcode, ubyte[] args) {
+		version (cpudiag) {
+			import std.stdio;
+			if (((args[1] << 8) | args[0]) == 5) {
+				if (state.mem.c == 9) {
+					write("message: ");
+					for (ushort i = state.mem.de; state.mem.memory[i] != '$'; i++) {
+						writef("%c", cast(char)state.mem.memory[i]);
+					}
+					writeln;
+					return cast(ushort)0;
+				} else if (state.mem.c == 2) {
+					return cast(ushort)0;
+				} else {
+					goto normalcall;
+				}
+			} else {
+				goto normalcall;
+			}
+		}
+normalcall:
+		state.call((args[1] << 8) | args[0]);
+		return cast(ushort)0; }, "CALL", "$%1%0", 2},
 	/*0xce: */{7, &ACI, "ACI", "#$%!", 1},
 	/*0xcf: */{11, genrst!0x8, "RST", "1"},
 	/*0xd0: */{11, gencret!("cy", false), "RNC"},
@@ -494,7 +516,7 @@ immutable Opcode[] opcodes = [
 	/*0xe3: */{18, (State state, ubyte opcode, ubyte[] args) { ubyte h = state.mem.h; ubyte l = state.mem.l; state.mem.l = state.pop; state.mem.h = state.pop; state.push(h); state.push(l); return cast(ushort)0; }, "XTHL"},
 	/*0xe4: */{17, genccall!("p", false), "CPO", "$%1%0", 2},
 	/*0xe5: */{11, (State state, ubyte opcode, ubyte[] args) { state.push(state.mem.h); state.push(state.mem.l); return cast(ushort)0; }, "PUSH", "H"},
-	/*0xe6: */{7, (State state, ubyte opcode, ubyte[] args) { state.mem.a &= args[0]; return state.mem.a; }, "ANI", "#$%!", 1},
+	/*0xe6: */{7, (State state, ubyte opcode, ubyte[] args) { state.mem.a &= args[0]; return state.mem.a; }, "ANI", "#$%!", 1, cccodes_set:Conditions.all},
 	/*0xe7: */{11, genrst!0x20, "RST 4"},
 	/*0xe8: */{11, gencret!("p", true), "RPE"},
 	/*0xe9: */{5, (State state, ubyte opcode, ubyte[] args) { state.mem.pc = state.mem.hl; return cast(ushort)0; }, "PCHL"},

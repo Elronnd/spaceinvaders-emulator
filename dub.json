@@ -1,5 +1,7 @@
 {
 	"name": "emu101",
+	"dflags-ldc": ["-O2"],
+	"versions": ["cpudiag"],
 	"authors": [
 		"elronnd"
 	],

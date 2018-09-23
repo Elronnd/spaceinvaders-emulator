@@ -10,7 +10,7 @@ import core.time: dur;
 import core.thread: Thread;
 import std.datetime.stopwatch: StopWatch;
 
-enum dbg = 0;
+enum dbg = 1;
 enum ns_per_cycle = 500;
 enum ns_per_frame = 16666666;
 import core.stdc.time: time_t;
@@ -33,6 +33,9 @@ void main(string[] args) {
 	__gshared bool done;
 	__gshared State s = new State();
 
+	version (cpudiag) {
+		s.mem.memory[0x100 .. 0x100 + 1453] = cast(ubyte[])read("roam/cpudiag.bin");
+	} else {
 	s.mem.memory[0x0000 .. 0x07ff + 1] = cast(ubyte[])read("roam/invaders.h");
 	s.mem.memory[0x0800 .. 0x0fff + 1] = cast(ubyte[])read("roam/invaders.g");
 	s.mem.memory[0x1000 .. 0x17ff + 1] = cast(ubyte[])read("roam/invaders.f");
@@ -82,6 +85,7 @@ void main(string[] args) {
 
 		}
 	}).start();
+	}
 	//print_dissasembly(s.mem);
 
 	enum Interrupt {
@@ -95,6 +99,7 @@ void main(string[] args) {
 		// intentionally unsigned.  It is allowed to go negative.  So, if we get to 16_666_664ns in this frame, then we want to execute 16_666_668ns worth of stuff next frame.  it Just Works™
 		long ns_this_frame;
 		while (true) {
+			version (cpu_diag) {} else {
 			if ((cycles_this_interrupt * ns_per_cycle * 2) >= ns_per_frame) {
 				ubyte[] interrupt;
 				final switch (interrupt_type) {
@@ -106,7 +111,7 @@ void main(string[] args) {
 						break;
 				}
 				if (s.interrupt_enabled) {
-					writefln("%s", interrupt_type);
+					//writefln("%s", interrupt_type);
 					s.interrupt_enabled = false;
 					s.interrupt = interrupt;
 					s.interrupted = true;
@@ -114,6 +119,7 @@ void main(string[] args) {
 
 				interrupt_type = cast(Interrupt)!interrupt_type;
 				cycles_this_interrupt = 0;
+			}
 			}
 
 
@@ -141,8 +147,7 @@ void main(string[] args) {
 			if (s.interrupted) {
 				op_args = s.interrupt[1 .. $];
 			} else {
-				s.mem.pc++;
-				op_args = s.mem.memory[s.mem.pc .. s.mem.pc += op.size];
+				op_args = s.mem.memory[s.mem.pc+1 .. s.mem.pc + op.size + 1];
 			}
 
 			static if (dbg) {
@@ -152,6 +157,7 @@ void main(string[] args) {
 					debug_instr(s);
 				}
 			}
+			s.mem.pc += op.size + 1;
 			//s.mem.memory[0x20c0] = 0;
 			ushort ans = op.fun(s, op_b, op_args);
 			set_conditions(s, ans, op.cccodes_set);
