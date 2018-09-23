@@ -10,7 +10,7 @@ import core.time: dur;
 import core.thread: Thread;
 import std.datetime.stopwatch: StopWatch;
 
-enum dbg = 1;
+enum dbg = 0;
 enum ns_per_cycle = 500;
 enum ns_per_frame = 16666666;
 import core.stdc.time: time_t;
@@ -84,28 +84,52 @@ void main(string[] args) {
 	}).start();
 	//print_dissasembly(s.mem);
 
-	while (!done) {
-		if (s.interrupt_enabled) {
-			s.interrupt = [0xcf]; // RST 1
-			s.interrupted = true;
-		}
+	enum Interrupt {
+		Vblank,
+		Hblank,
+	}
+	Interrupt interrupt_type;
+	ulong cycles_this_interrupt;
 
+	while (!done) {
 		// intentionally unsigned.  It is allowed to go negative.  So, if we get to 16_666_664ns in this frame, then we want to execute 16_666_668ns worth of stuff next frame.  it Just Works™
 		long ns_this_frame;
 		while (true) {
-			if (s.interrupt_enabled && s.interrupted) {
-				s.interrupted = false;
-				interrupt(s, s.interrupt);
+			if ((cycles_this_interrupt * ns_per_cycle * 2) >= ns_per_frame) {
+				ubyte[] interrupt;
+				final switch (interrupt_type) {
+					case Interrupt.Vblank:
+						interrupt = [0xcf];
+						break;
+					case Interrupt.Hblank:
+						interrupt = [0xd7];
+						break;
+				}
+				if (s.interrupt_enabled) {
+					writefln("%s", interrupt_type);
+					s.interrupt_enabled = false;
+					s.interrupt = interrupt;
+					s.interrupted = true;
+				}
+
+				interrupt_type = cast(Interrupt)!interrupt_type;
+				cycles_this_interrupt = 0;
 			}
 
-			static if (dbg) {
-				debug_instr(s);
-			}
 
 			// fetch the op
-			ubyte op_b = s.mem.memory[s.mem.pc];
+			ubyte op_b;
+			ubyte[] op_args;
+
+			if (s.interrupted) {
+				op_b = s.interrupt[0];
+			} else {
+				op_b = s.mem.memory[s.mem.pc];
+			}
 			opcodes.Opcode op = opcodes.opcodes[op_b];
 			ns_this_frame += op.cycles * ns_per_cycle;
+			cycles_this_interrupt += op.cycles;
+
 
 			// if it would push us over the the limit for one frame, then sleep now and defer it until the next frame
 			if (ns_this_frame > ns_per_frame) {
@@ -114,20 +138,32 @@ void main(string[] args) {
 			}
 
 			// now actually execute it
-			s.mem.pc++;
-			ushort ans = op.fun(s, op_b, s.mem.memory[s.mem.pc .. s.mem.pc += op.size]);
+			if (s.interrupted) {
+				op_args = s.interrupt[1 .. $];
+			} else {
+				s.mem.pc++;
+				op_args = s.mem.memory[s.mem.pc .. s.mem.pc += op.size];
+			}
+
+			static if (dbg) {
+				if (s.interrupted) {
+					debug_instr(s, s.interrupt);
+				} else {
+					debug_instr(s);
+				}
+			}
+			//s.mem.memory[0x20c0] = 0;
+			ushort ans = op.fun(s, op_b, op_args);
 			set_conditions(s, ans, op.cccodes_set);
+			s.interrupted = false;
 		}
 		ulong sleep_time = ns_per_frame - time_mod_n(ns_per_frame);
 		//writefln("Sleeping for %s", sleep_time);
-		if (s.interrupt_enabled) {
-			s.interrupt = [0xd7]; // RST 2
-			s.interrupted = true;
-		}
+		/*
+
+		*/
 
 		Thread.sleep(dur!"nsecs"(sleep_time));
-
 	}
-
 quit:
 }

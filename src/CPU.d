@@ -115,11 +115,14 @@ void set_conditions(State state, ushort ans, Conditions conditions) {
 //	state.condition.ac = (ans & 0xff) != 0;
 }
 
-void debug_instr(State state) {
+void debug_instr(State state, ubyte[] interrupt = []) {
 	string err_reason;
 	bool valid_cmd;
 
-	writefln("Execution: %s", disasemble_instr(state.mem, state.mem.pc));
+	if (interrupt) {
+		writeln("INTERRUPTED!");
+	}
+	writefln("Execution: %04x: %s", state.mem.pc, disasemble_instr(interrupt ? interrupt : state.mem.memory[state.mem.pc .. $]));
 	with (state.mem) writefln("Registers: a: 0x%02x, b: 0x%02x, c: 0x%02x, d: 0x%02x, e: 0x%02x, h: 0x%02x, l: 0x%02x, bc: 0x%04x, de: 0x%04x, hl: 0x%04x, sp: 0x%04x, pc: 0x%04x.", a, b, c, d, e, h, l, bc, de, hl, sp, pc);
 	with (state.mem) writefln("Registers: a: %-4s, b: %-4s, c: %-4s, d: %-4s, e: %-4s, h: %-4s, l: %-4s, bc: %-6s, de: %-6s, hl: %-6s, sp: %-6s, pc: %-6s.", a, b, c, d, e, h, l, bc, de, hl, sp, pc); // todo: make this prettier ('a: 5,    b:' instead of 'a: 5   , :' (or possibly it should be 'a:   5,  b:' so that the 5 lines up with the '5' in '0x5' instead of the '0'?))
 	with (state.condition) writefln("Flags: %s%s%s%s%s.  %s", z ? "zero, " : "", s ? "sign, " : "", p ? "parity, " : "", cy ? "carry, " : "", ac ? "auxilliary carry" : "", state.interrupt_enabled ? "Interrupts enabled" : "Interrupts not enabled");
@@ -176,6 +179,7 @@ ubyte run(State state) {
 }
 */
 
+/*
 ubyte interrupt(State state, ubyte[] codes) {
 	opcodes.Opcode curr = opcodes.opcodes[codes[0]];
 	if ((codes.length - 1) != curr.size) {
@@ -185,18 +189,18 @@ ubyte interrupt(State state, ubyte[] codes) {
 	set_conditions(state, curr.fun(state, codes[0], codes[1 .. $]), curr.cccodes_set);
 	return opcodes.opcodes[codes[0]].cycles;
 }
+*/
 
-private pure string disasemble_instr(Mem mem, ushort pc) {
+private pure string disasemble_instr(ubyte[] mem) {
 	opcodes.Opcode op;
 	string ret;
-	ret ~= format("%04x: ", pc);
 
-	op = opcodes.opcodes[mem.memory[pc]];
+	op = opcodes.opcodes[mem[0]];
 
-	string hex = format("%02x", mem.memory[pc++]);
+	string hex = format("%02x", mem[0]);
 
 	foreach (i; 0 .. op.size) {
-		hex ~= format(" %02x", mem.memory[pc+i]);
+		hex ~= format(" %02x", mem[i+1]);
 	}
 	ret ~= format("%-8s", hex); // max 8 characters (6 hex, plus 2 spaces, plus some padding
 	// - left-aligns
@@ -206,7 +210,7 @@ private pure string disasemble_instr(Mem mem, ushort pc) {
 
 	ret ~= op.opcode;
 	ret ~= '\t';
-	ret ~= cformat(op.format_string, mem.memory[pc .. pc+op.size]);
+	ret ~= cformat(op.format_string, mem[1 .. op.size+1]);
 
 	return ret;
 }
@@ -217,7 +221,7 @@ void print_dissasembly(Mem mem) {
 	ushort pc = 0;
 
 	while (pc < mem.memory.length /* 0x1fff */) {
-		writeln(disasemble_instr(mem, pc));
+		//writeln(disasemble_instr(mem, pc)); // TODO
 
 		// skip over arguments and instruction
 		pc += opcodes.opcodes[mem.memory[pc]].size + 1;
