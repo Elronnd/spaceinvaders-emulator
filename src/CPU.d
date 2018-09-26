@@ -100,6 +100,15 @@ void push(State state, ubyte value) {
 
 
 void set_conditions(State state, ushort ans, Conditions conditions) {
+	bool parity(ubyte x) {
+		ubyte set_bits;
+		foreach (_; 0 .. 8) {
+			set_bits += x & 1;
+			x >>= 1;
+		}
+		return set_bits % 2 == 0;
+	}
+
 	if (conditions & Conditions.z) {
 		state.condition.z = ((ans & 0xff) == 0);
 	}
@@ -107,7 +116,8 @@ void set_conditions(State state, ushort ans, Conditions conditions) {
 		state.condition.s = ((ans & 0x80) != 0);
 	}
 	if (conditions & Conditions.p) {
-		state.condition.p = !((ans&0xff) & 1);
+		state.condition.p = parity(ans & 0xff);
+		//state.condition.p = !((ans&0xff) & 1);
 	}
 	if (conditions & Conditions.cy) {
 		state.condition.cy = (ans > 0xff);
@@ -122,10 +132,10 @@ void debug_instr(State state, ubyte[] interrupt = []) {
 	if (interrupt) {
 		writeln("INTERRUPTED!");
 	}
-	writefln("Execution: %04x: %s", state.mem.pc, disasemble_instr(interrupt ? interrupt : state.mem.memory[state.mem.pc .. $]));
 	with (state.mem) writefln("Registers: a: 0x%02x, b: 0x%02x, c: 0x%02x, d: 0x%02x, e: 0x%02x, h: 0x%02x, l: 0x%02x, bc: 0x%04x, de: 0x%04x, hl: 0x%04x, sp: 0x%04x, pc: 0x%04x.", a, b, c, d, e, h, l, bc, de, hl, sp, pc);
 	with (state.mem) writefln("Registers: a: %-4s, b: %-4s, c: %-4s, d: %-4s, e: %-4s, h: %-4s, l: %-4s, bc: %-6s, de: %-6s, hl: %-6s, sp: %-6s, pc: %-6s.", a, b, c, d, e, h, l, bc, de, hl, sp, pc); // todo: make this prettier ('a: 5,    b:' instead of 'a: 5   , :' (or possibly it should be 'a:   5,  b:' so that the 5 lines up with the '5' in '0x5' instead of the '0'?))
 	with (state.condition) writefln("Flags: %s%s%s%s%s.  %s", z ? "zero, " : "", s ? "sign, " : "", p ? "parity, " : "", cy ? "carry, " : "", ac ? "auxilliary carry" : "", state.interrupt_enabled ? "Interrupts enabled" : "Interrupts not enabled");
+	writefln("Execution: %04x: %s\n", state.mem.pc, disasemble_instr(interrupt ? interrupt : state.mem.memory[state.mem.pc .. $]));
 
 	while (true) {
 		write("> ");

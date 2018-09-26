@@ -273,7 +273,7 @@ immutable Opcode[] opcodes = [
 	/*0x06: */{7, genmvi!'b', "MVI", "B,#0x%!", 1},
 	/*0x07: */{4, (State state, ubyte opcode, ubyte[] args) { /* manually set cy because it's set differently */ state.condition.cy = (state.mem.a >> 7); state.mem.a = cast(ubyte)(((state.mem.a << 1) | (state.mem.a >> 7)) & 0xff); return cast(ushort)0; }, "RLC"},
 	/*0x08: */{4, &nop, "NOP"},
-	/*0x09: */{10, gendad!"bc", "DAD B", cccodes_set:Conditions.cy},
+	/*0x09: */{10, gendad!"bc", "DAD B"},
 	/*0x0a: */{7, genldax!"bc", "LDAX B"},
 	/*0x0b: */{5, gendcx!"bc", "DCX BC"},
 	/*0x0c: */{5, geninr!'c', "INR C", cccodes_set:Conditions.all & ~(Conditions.cy)},
@@ -289,7 +289,7 @@ immutable Opcode[] opcodes = [
 	/*0x16: */{7, genmvi!'d', "MVI", "D,#$%!", 1},
 	/*0x17: */{4, (State state, ubyte opcode, ubyte[] args) { /* Yeah I have no idea wtf is going on with this opcode */ bool newcy = cast(bool)(state.mem.a & 0b10000000); state.mem.a = cast(ubyte)(((state.mem.a << 1)&0xff) | state.condition.cy); state.condition.cy = newcy; return cast(ushort)0; }, "RAL"},
 	/*0x18: */{4, &nop, "NOP"},
-	/*0x19: */{10, gendad!"de", "DAD D", cccodes_set:Conditions.cy},
+	/*0x19: */{10, gendad!"de", "DAD D"},
 	/*0x1a: */{7, genldax!"de", "LDAX D"},
 	/*0x1b: */{5, gendcx!"de", "DCX DE"},
 	/*0x1c: */{5, geninr!'e', "INR E", cccodes_set:Conditions.all & ~(Conditions.cy)},
@@ -305,7 +305,7 @@ immutable Opcode[] opcodes = [
 	/*0x26: */{7, genmvi!'h', "MVI", "H,#$%!", 1},
 	/*0x27: */{4, &un_impl, "DAA", "special"},
 	/*0x28: */{4, &nop, "NOP"},
-	/*0x29: */{10, gendad!"hl", "DAD H", cccodes_set:Conditions.cy},
+	/*0x29: */{10, gendad!"hl", "DAD H"},
 	/*0x2a: */{16, (State state, ubyte opcode, ubyte[] args) { ushort ptr = (args[1] << 8) | args[0]; state.mem.l = state.mem.memory[ptr]; state.mem.h = state.mem.memory[ptr+1]; return cast(ushort)0; }, "LHLD", "LH = #$%1%0", 2},
 	/*0x2b: */{5, gendcx!"hl", "DCX HL"},
 	/*0x2c: */{5, geninr!'l', "INR L", cccodes_set:Conditions.all & ~(Conditions.cy)},
@@ -321,7 +321,7 @@ immutable Opcode[] opcodes = [
 	/*0x36: */{10, genmvi!'m', "MVI", "M,#$%!", 1},
 	/*0x37: */{4, (State state, ubyte opcode, ubyte[] args) { /* Why TF is this SeT Carry instead of STore C???  Be consistent, intel!! */ state.condition.cy = true; return cast(ushort)0; }, "STC"},
 	/*0x38: */{4, &nop, "NOP"},
-	/*0x39: */{10, gendad!"sp", "DAD SP", cccodes_set:Conditions.cy},
+	/*0x39: */{10, gendad!"sp", "DAD SP"},
 	/*0x3a: */{13, (State state, ubyte opcode, ubyte[] args) { state.mem.a = state.mem.memory[(args[1] << 8) | args[0]]; return cast(ushort)0; }, "LDA", "$%1%0", 2},
 	/*0x3b: */{5, gendcx!"sp", "DCX SP"},
 	/*0x3c: */{5, geninr!'a', "INR A", cccodes_set:Conditions.all & ~(Conditions.cy)},
@@ -472,6 +472,7 @@ immutable Opcode[] opcodes = [
 	/*0xcd: */{17, (State state, ubyte opcode, ubyte[] args) {
 		version (cpudiag) {
 			import std.stdio;
+			//writefln("call cpudiag %s.  c = %s", args, state.mem.c);
 			if (((args[1] << 8) | args[0]) == 5) {
 				if (state.mem.c == 9) {
 					write("message: ");
@@ -492,15 +493,15 @@ immutable Opcode[] opcodes = [
 normalcall:
 		state.call((args[1] << 8) | args[0]);
 		return cast(ushort)0; }, "CALL", "$%1%0", 2},
-	/*0xce: */{7, &ACI, "ACI", "#$%!", 1},
+	/*0xce: */{7, &ACI, "ACI", "#$%!", 1, cccodes_set:Conditions.all},
 	/*0xcf: */{11, genrst!0x8, "RST", "1"},
 	/*0xd0: */{11, gencret!("cy", false), "RNC"},
 	/*0xd1: */{10, (State state, ubyte opcode, ubyte[] args) { state.mem.e = state.pop; state.mem.d = state.pop; return cast(ushort)0; }, "POP", "D"},
 	/*0xd2: */{10, gencjmp!("cy", false), "JNC", "$%1%0", 2},
 	/*0xd3: */{10, (State state, ubyte opcode, ubyte[] args) { OUT(state, args[0]); return cast(ushort)0; }, "OUT", "%!", 1},
 	/*0xd4: */{17, genccall!("cy", false), "CNC", "$%1%0", 2},
-	/*0xd5: */{11, (State state,  ubyte opcode, ubyte[] args) { state.push(state.mem.d); state.push(state.mem.e); return cast(ushort)0; }, "PUSH", "D"},
-	/*0xd6: */{7, &SUI, "SUI", "#$%!", 1},
+	/*0xd5: */{11, (State state,  ubyte opcode, ubyte[] args) { state.push(state.mem.d); state.push(state.mem.e); return cast(ushort)0; }, "PUSH", "DE"},
+	/*0xd6: */{7, &SUI, "SUI", "#$%!", 1, cccodes_set:Conditions.all},
 	/*0xd7: */{11, genrst!0x10, "RST", "2"},
 	/*0xd8: */{11, gencret!("cy", true), "RC"},
 	/*0xd9: */{10, &nop, "NOP"},
@@ -508,7 +509,7 @@ normalcall:
 	/*0xdb: */{10, (State state, ubyte opcode, ubyte[] args) { state.mem.a = IN(state, args[0]); return cast(ushort)0; }, "IN", "#$%! (special)", 1},
 	/*0xdc: */{10, genccall!("cy", true), "CC", "$%1%0", 2},
 	/*0xdd: */{17, &nop, "NOP"},
-	/*0xde: */{7, &un_impl, "SBI", "#$%!", 1},
+	/*0xde: */{7, (State state, ubyte opcode, ubyte[] args) { ushort a = state.mem.a; a -= args[0] - state.condition.cy; state.mem.a = a & 0xff; return a; }, "SBI", "#$%!", 1, cccodes_set: Conditions.all},
 	/*0xdf: */{11, genrst!0x18, "RST 3"},
 	/*0xe0: */{11, gencret!("p", false), "RPO"},
 	/*0xe1: */{10, (State state, ubyte opcode, ubyte[] args) { state.mem.l = state.pop; state.mem.h = state.pop; return cast(ushort)0; }, "POP H"},
@@ -524,7 +525,7 @@ normalcall:
 	/*0xeb: */{5, (State state, ubyte opcode, ubyte[] args) { swap(state.mem.hl, state.mem.de); return cast(ushort)0; }, "XCHG"},
 	/*0xec: */{17, genccall!("p", true), "CPE", "$%1%0", 2},
 	/*0xed: */{17, &nop, "NOP"},
-	/*0xee: */{7, &un_impl, "XRI", "#$%!", 1},
+	/*0xee: */{7, (State state, ubyte opcode, ubyte[] args) => state.mem.a ^= args[0], "XRI", "#$%!", 1},
 	/*0xef: */{11, genrst!0x28, "RST", "5"},
 	/*0xf0: */{11, gencret!("s", false), "RP"},
 	/*0xf1: */{10, (State state, ubyte opcode, ubyte[] args) { ubyte flags = state.pop; state.mem.a = state.pop; state.condition.cy = flags & 1; state.condition.p = cast(bool)(flags & 0b00000100); state.condition.ac = cast(bool)(flags & 0b00010000); state.condition.z = cast(bool)(flags & 0b01000000); state.condition.s = cast(bool)(flags & 0b10000000); return cast(ushort)0; }, "POP", "PSW"},
@@ -532,7 +533,7 @@ normalcall:
 	/*0xf3: */{4, (State state, ubyte opcode, ubyte[] args) { state.interrupt_enabled = false; return cast(ushort)0; }, "DI"},
 	/*0xf4: */{17, genccall!("s", false), "CP", "$%1%0", 2},
 	/*0xf5: */{11, (State state, ubyte opcode, ubyte[] args) { state.push(state.mem.a); state.push(state.condition.cy | (1 << 1) | (state.condition.p << 2) | (0 << 3) | (state.condition.ac << 4) | (0 << 5) | (state.condition.z << 6) | (state.condition.s << 7)); return cast(ushort)0; }, "PUSH", "PSW"},
-	/*0xf6: */{7, &un_impl, "ORI", "#$%!", 1},
+	/*0xf6: */{7, (State state, ubyte opcode, ubyte[] args) => state.mem.a |= args[0], "ORI", "#$%!", 1, cccodes_set:Conditions.all},
 	/*0xf7: */{11, genrst!0x30, "RST", "6"},
 	/*0xf8: */{11, gencret!("s", true), "RM"},
 	/*0xf9: */{5, (State state, ubyte opcode, ubyte[] args) { state.mem.sp = state.mem.hl; return cast(ushort)0; }, "SPHL"},
@@ -540,6 +541,6 @@ normalcall:
 	/*0xfb: */{4, (State state, ubyte opcode, ubyte[] args) { state.interrupt_enabled = true; return cast(ushort)0; }, "EI"},
 	/*0xfc: */{17, genccall!("s", true), "CM", "$%1%0", 2},
 	/*0xfd: */{17, &nop, "NOP"},
-	/*0xfe: */{7, (State state, ubyte opcode, ubyte[] args) { state.condition.cy = state.mem.a < args[0]; ubyte x = cast(ubyte)(state.mem.a - args[0]); return x; }, "CPI", "#$%!", 1, cccodes_set:Conditions.all & ~(Conditions.cy)},
+	/*0xfe: */{7, (State state, ubyte opcode, ubyte[] args) { state.condition.cy = state.mem.a < args[0]; ushort x = cast(ushort)(state.mem.a - args[0]); return x; }, "CPI", "#$%!", 1, cccodes_set:Conditions.all & ~(Conditions.cy)},
 	/*0xff: */{11, genrst!0x38, "RST", "7"},
 	];

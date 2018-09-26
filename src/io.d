@@ -39,6 +39,7 @@ void OUT(State state, ubyte port) {
 			break;
 		case 3:
 			writeln("Play other sound");
+			break;
 		case 4:
 			writeln("out 4");
 			shift = ((shift << 8) | state.mem.a) & 0xffff;

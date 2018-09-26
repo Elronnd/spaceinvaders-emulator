@@ -10,6 +10,12 @@ import core.time: dur;
 import core.thread: Thread;
 import std.datetime.stopwatch: StopWatch;
 
+version (cpudiag) {
+	pragma(msg, "Running in cpu dialogue mode");
+} else {
+	pragma(msg, "Running in normal mode");
+}
+
 enum dbg = 1;
 enum ns_per_cycle = 500;
 enum ns_per_frame = 16666666;
@@ -89,8 +95,8 @@ void main(string[] args) {
 	//print_dissasembly(s.mem);
 
 	enum Interrupt {
-		Vblank,
 		Hblank,
+		Vblank,
 	}
 	Interrupt interrupt_type;
 	ulong cycles_this_interrupt;
@@ -157,8 +163,8 @@ void main(string[] args) {
 					debug_instr(s);
 				}
 			}
-			s.mem.pc += op.size + 1;
 			//s.mem.memory[0x20c0] = 0;
+			s.mem.pc += op.size + 1;
 			ushort ans = op.fun(s, op_b, op_args);
 			set_conditions(s, ans, op.cccodes_set);
 			s.interrupted = false;
